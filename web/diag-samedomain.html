@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>同域探针 RUNNING</title>
+<style>
+  body{font:12px/1.5 monospace;background:#0f1115;color:#e8eaf0;padding:10px;margin:0}
+  .r{padding:3px 0;border-bottom:1px solid #262b36;white-space:pre-wrap;word-break:break-all}
+  .ok{color:#3ddc84}.bad{color:#ff5c5c}.dim{color:#8b93a7}
+  #v{font-size:14px;font-weight:700;padding:8px;background:#221a12;border:1px solid #EA5504;border-radius:8px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div id="v">同域 vs 跨域 API 对照探针运行中…</div>
+<div id="out"></div>
+<script>
+/* 目的：验证静态托管域(tcloudbaseapp.com)能否同域转发 /api/asr，
+   若同域通而跨域(app.tcloudbase.com)不稳，则把正式页 API_BASE 换成同域即可根治。 */
+var ORIGIN = location.origin; /* 页面所在域，期望 tcloudbaseapp.com */
+var CROSS  = 'https://work-d1gs0jzrg2277d75e-1391683363.ap-shanghai.app.tcloudbase.com/api/asr';
+var SAME   = ORIGIN + '/api/asr';
+var out = document.getElementById('out');
+var lines = [];
+function w(txt, cls) {
+  lines.push('<div class="r ' + (cls || '') + '">' + String(txt).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }) + '</div>');
+  out.innerHTML = lines.join('');
+}
+function b64(n) { var C = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'; var s = ''; for (var i = 0; i < n; i++) s += C[i & 63]; return s; }
+var bodyStr = JSON.stringify({ audio_base64: b64(64 * 1024), format: 'wav' });
+
+/* 同 URL 连打 3 次，测随机性 */
+async function hit(label, url, times) {
+  for (var i = 1; i <= times; i++) {
+    var t = Date.now();
+    try {
+      var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: bodyStr });
+      var tx = await r.text();
+      /* 502 asr_api_error = 请求完整到达腾讯云（假音频预期错）= 链路通
+         404/INVALID_PATH 或返回 HTML = 该域不支持 API 转发
+         catch = 浏览器层失败（链路被掐） */
+      var verdict = (r.status === 502 && tx.indexOf('asr') >= 0) ? '✅链路通(502业务错)'
+                  : (r.status === 404 || r.status === 405) ? '⚠️HTTP ' + r.status + '（' + (r.status === 405 ? '路由通但方法受限' : '该域可能不支持API转发') + '）'
+                  : 'HTTP ' + r.status;
+      w(label + ' #' + i + ' -> ' + verdict + ' ' + (Date.now() - t) + 'ms | ' + tx.slice(0, 60), r.status < 500 ? 'ok' : (r.status === 502 ? 'ok' : 'dim'));
+    } catch (e) {
+      w(label + ' #' + i + ' -> ❌FAIL ' + e.name + ' ' + (Date.now() - t) + 'ms ' + e.message, 'bad');
+    }
+  }
+}
+(async function () {
+  w('origin=' + ORIGIN, 'dim');
+  w('对照：跨域(app.tcloudbase.com，现在正式页在用的) × 3 次', '');
+  await hit('跨域', CROSS, 3);
+  w('对照：同域(tcloudbaseapp.com，候选修复方案) × 3 次', '');
+  await hit('同域', SAME, 3);
+  var v = 'RESULT: 看上面——若「同域✅跨域❌/不稳」→ 改一行API_BASE即可根治';
+  document.getElementById('v').textContent = v;
+  document.title = v;
+  var big = document.createElement('div');
+  big.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99;background:#000;color:#0f0;font:700 13px monospace;padding:6px 10px';
+  big.textContent = v;
+  document.body.appendChild(big);
+})();
+</script>
+</body>
+</html>

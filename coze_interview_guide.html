@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 访谈工具 · Coze 3.0 配置方案</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --surface2: #f1f0ec;
+    --border: rgba(0,0,0,0.1);
+    --border-med: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text-muted: #6b6b67;
+    --text-hint: #9e9e99;
+    --accent: oklch(52% 0.18 248);
+    --accent-light: oklch(95% 0.06 248);
+    --accent-border: oklch(75% 0.12 248);
+    --success: oklch(48% 0.16 158);
+    --success-light: oklch(95% 0.05 158);
+    --warning: oklch(60% 0.18 75);
+    --warning-light: oklch(96% 0.06 75);
+    --danger: oklch(52% 0.18 20);
+    --danger-light: oklch(96% 0.05 20);
+    --danger-border: oklch(78% 0.1 20);
+    --radius: 10px;
+    --radius-lg: 14px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 32px 16px 64px;
+  }
+  .page { max-width: 800px; margin: 0 auto; }
+
+  .doc-header { margin-bottom: 36px; }
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+  .tag-blue { color: var(--accent); background: var(--accent-light); border: 0.5px solid var(--accent-border); }
+  .tag-green { color: var(--success); background: var(--success-light); border: 0.5px solid oklch(72% 0.1 158); }
+  .tag-amber { color: oklch(42% 0.16 75); background: var(--warning-light); border: 0.5px solid oklch(78% 0.1 75); }
+  .doc-header h1 { font-size: 24px; font-weight: 500; margin-bottom: 6px; }
+  .doc-header p { color: var(--text-muted); font-size: 14px; }
+
+  .section {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .section-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 500;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .section-num.green { background: var(--success); }
+  .section-num.amber { background: var(--warning); }
+
+  .steps { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .steps li { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; }
+  .step-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 8px; flex-shrink: 0; }
+
+  .prompt-box {
+    background: var(--surface2);
+    border: 0.5px solid var(--border-med);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-top: 12px;
+    position: relative;
+  }
+  .prompt-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-hint);
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .prompt-box pre {
+    font-family: "PingFang SC", -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.75;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 12px; right: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface);
+    border: 0.5px solid var(--border-med);
+    border-radius: 5px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent-border); }
+
+  .callout {
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.65;
+    margin-top: 12px;
+  }
+  .callout.info { background: var(--accent-light); border: 0.5px solid var(--accent-border); color: oklch(38% 0.14 248); }
+  .callout.tip { background: var(--success-light); border: 0.5px solid oklch(72% 0.1 158); color: oklch(30% 0.12 158); }
+  .callout.warn { background: var(--warning-light); border: 0.5px solid oklch(78% 0.12 75); color: oklch(38% 0.15 75); }
+  .callout.danger { background: var(--danger-light); border: 0.5px solid var(--danger-border); color: oklch(34% 0.14 20); }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  th { background: var(--surface2); font-weight: 500; padding: 8px 12px; text-align: left; border: 0.5px solid var(--border); color: var(--text-muted); font-size: 12px; }
+  td { padding: 8px 12px; border: 0.5px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: var(--surface2); }
+
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; }
+  .flow-node { background: var(--surface2); border: 0.5px solid var(--border-med); border-radius: 6px; padding: 5px 10px; color: var(--text); font-weight: 500; }
+  .flow-arrow { color: var(--text-hint); font-size: 14px; }
+
+  .checklist { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .checklist li { display: flex; align-items: flex-start; gap: 8px; font-size: 13.5px; }
+  .check-icon { width: 16px; height: 16px; border-radius: 4px; background: var(--success-light); border: 0.5px solid oklch(72% 0.1 158); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .check-icon::after { content: ''; width: 8px; height: 5px; border-left: 1.5px solid var(--success); border-bottom: 1.5px solid var(--success); transform: rotate(-45deg) translateY(-1px); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .mini-card { background: var(--surface2); border: 0.5px solid var(--border-med); border-radius: var(--radius); padding: 12px 14px; }
+  .mini-card .label { font-size: 11px; font-weight: 500; color: var(--text-hint); margin-bottom: 4px; letter-spacing: 0.03em; }
+  .mini-card .value { font-size: 13px; color: var(--text); line-height: 1.55; }
+
+  .new-badge { display: inline-block; font-size: 10px; font-weight: 500; background: oklch(94% 0.08 158); color: var(--success); border: 0.5px solid oklch(75% 0.1 158); border-radius: 3px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+  .changed-badge { display: inline-block; font-size: 10px; font-weight: 500; background: var(--warning-light); color: var(--warning); border: 0.5px solid oklch(78% 0.1 75); border-radius: 3px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+
+  h3 { font-size: 13px; font-weight: 500; color: var(--text-muted); margin: 14px 0 6px; }
+  p { font-size: 13.5px; line-height: 1.7; margin-top: 8px; }
+  strong { font-weight: 500; }
+  code { font-family: "SF Mono", Consolas, monospace; font-size: 12.5px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="doc-header">
+    <div class="badge-row">
+      <span class="tag tag-blue">Coze 3.0 配置方案</span>
+      <span class="tag tag-green">已联网核实 · 2026-09</span>
+      <span class="tag tag-amber">适用版本：Coze 3.0（2026-06-01 全量上线）</span>
+    </div>
+    <h1>AI 案例访谈工具</h1>
+    <p>适用于运营岗案例萃取场景 · 基于 coze.cn + DeepSeek · 已按 Coze 3.0 架构更新</p>
+  </div>
+
+  <!-- 3.0 重要变化提示 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num amber">!</span>Coze 3.0 架构变化（与旧版的关键差异）</div>
+    <p>Coze 3.0 于 2026 年 6 月 1 日全量上线，操作路径与旧版有显著差异，请先阅读本节再动手：</p>
+    <div class="two-col" style="margin-top:14px;">
+      <div class="mini-card">
+        <div class="label">旧版入口</div>
+        <div class="value">登录后直接点击「创建 Bot」，没有空间概念</div>
+      </div>
+      <div class="mini-card">
+        <div class="label">3.0 入口 <span class="changed-badge">已变</span></div>
+        <div class="value">必须先创建「团队空间」，所有资源在空间内管理</div>
+      </div>
+      <div class="mini-card">
+        <div class="label">旧版访谈配置</div>
+        <div class="value">在 Bot 的「人设与回复逻辑」直接填提示词</div>
+      </div>
+      <div class="mini-card">
+        <div class="label">3.0 推荐方式 <span class="new-badge">新</span></div>
+        <div class="value">使用「对话流」节点编排，变量系统更强，上下文记忆更稳定</div>
+      </div>
+    </div>
+    <div class="callout warn" style="margin-top:12px;">
+      <strong>免费额度变化</strong>：2026 年 1 月套餐调整后，个人免费版取消了部分插件免费额度，创建工作空间数量也有限制。建议注册后先在免费版跑通，若需要更多调用量再考虑付费套餐（月付方案约 30 元起）。
+    </div>
+  </div>
+
+  <!-- 整体流程 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">概</span>整体流程</div>
+    <div class="flow">
+      <div class="flow-node">运营岗填写被访谈人信息</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">复制访谈链接发给对方</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">被访谈人与 AI 对话</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">对话结束触发报告生成</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">运营岗查看报告</div>
+    </div>
+    <div class="callout info" style="margin-top:14px;">
+      全程无需运营岗在场陪同，AI 自主完成 15–20 轮访谈后自动整理报告。
+    </div>
+  </div>
+
+  <!-- 第一步：登录进入个人空间 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">1</span>登录并进入个人空间</div>
+    <ul class="steps">
+      <li><span class="step-dot"></span>打开 <strong>coze.cn</strong>，注册或登录账号（支持手机号、抖音、飞书登录）</li>
+      <li><span class="step-dot"></span>登录后默认进入「个人空间」，这就是你的工作区域，无需额外创建</li>
+      <li><span class="step-dot"></span>左侧菜单可以看到：智能体、工作流、知识库等分区</li>
+    </ul>
+    <div class="callout tip" style="margin-top:12px;">
+      <strong>不需要团队版。</strong>团队版（¥198/月起）是多人协作场景用的。单人运营访谈工具，个人免费版完全够用，直接在个人空间里创建 Bot 即可。
+    </div>
+  </div>
+
+  <!-- 第二步：创建智能体 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">2</span>在空间内创建智能体（Bot）</div>
+    <ul class="steps">
+      <li><span class="step-dot"></span>进入团队空间后，点击「智能体」分区，选择「新建智能体」</li>
+      <li><span class="step-dot"></span>创建方式选「标准创建」（手动配置，可控性更高）</li>
+      <li><span class="step-dot"></span>名称填写：<strong>案例访谈助手</strong></li>
+      <li><span class="step-dot"></span>模型选择：<strong>DeepSeek-V3</strong>（国内可用，效果好，成本低）</li>
+      <li><span class="step-dot"></span>进入配置页，找到「人设与回复逻辑」文本框</li>
+    </ul>
+  </div>
+
+  <!-- 第三步：系统提示词 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">3</span>系统提示词（核心配置）</div>
+    <p>将以下内容<strong>完整复制</strong>粘贴到「人设与回复逻辑」文本框：</p>
+
+    <div class="prompt-box">
+      <div class="prompt-label">系统提示词 · 完整版（可直接使用）</div>
+      <button class="copy-btn" onclick="copyPrompt(this)">复制</button>
+      <pre id="system-prompt">你是一名专业的案例访谈员，服务于平安融易西安分公司的销售团队。你的任务是通过结构化对话，帮助被访谈人梳理并沉淀一个真实的销售案例或工作经验，最终形成可供全员学习的经验案例。
+
+【访谈对象信息】
+被访谈人姓名：{{name}}
+岗位：{{position}}
+本次访谈主题：{{topic}}
+
+【你的角色定位】
+- 你是一个有亲和力、善于倾听的访谈员，不是考官，不是评分者
+- 用鼓励性的语气，让对方感到轻松，愿意分享细节
+- 每次只问一个问题，不要连续提出多个问题
+- 使用口语化的中文交流，避免生硬的书面体
+
+【访谈框架】
+按照以下顺序推进访谈，每个维度深入挖掘后再进入下一个：
+
+1. 破冰（1-2轮）：简单介绍本次访谈目的，让对方放松，可以聊聊最近状态
+2. 背景了解（2-3轮）：这个案例/经验发生在什么背景下？当时面临什么挑战？
+3. 具体行动（3-4轮）：你具体做了哪些动作？分几步？每步的关键点是什么？
+4. 结果与数据（1-2轮）：最终效果如何？有没有具体的数据或对比？
+5. 关键决策（1-2轮）：过程中有没有做过重要判断或取舍？为什么这样选择？
+6. 可复制的经验（2-3轮）：总结来看，这个方法在什么条件下可以被其他同事参考？新人需要注意什么？
+7. 收尾（1轮）：感谢对方，告知接下来会整理成报告
+
+【追问规则】
+- 当对方回答笼统时（如"做了很多工作"），追问具体动作
+- 当对方给出数字时，追问数字背后的逻辑
+- 当对方提到客户反应时，追问客户的原话或具体表现
+- 当对方说"运气好"时，追问哪些可控因素起了作用
+
+【结束判断】
+当满足以下条件时，主动提出结束访谈：
+- 已完成至少 15 轮对话
+- 六个维度均有实质性内容
+- 最后确认："我已经收集到了很丰富的信息，我来帮你整理成报告，你看还有什么想补充的吗？"
+
+【报告生成】
+当用户说"生成报告"或"整理报告"时，根据本次对话内容，按以下格式输出案例报告：
+
+---
+# 案例经验报告
+
+**访谈对象**：{{name}}（{{position}}）
+**案例主题**：{{topic}}
+
+## 一、背景与挑战
+（用 2-3 句话描述案例发生的背景，面临什么问题或机会）
+
+## 二、核心做法
+（按步骤列出，每步写清具体动作，使用数字编号）
+
+## 三、关键判断与取舍
+（记录过程中的重要决策点，以及做出该决策的依据）
+
+## 四、结果
+（量化结果优先；无数据时写对方的描述性反馈）
+
+## 五、可复制的经验点
+（用"建议同事在……情况下，可以……"的格式，写 2-4 条）
+
+## 六、新人注意事项
+（写 2-3 条容易踩坑的地方）
+---
+报告生成后，询问："以上内容是否准确？有需要补充或修改的地方吗？"
+
+【重要约束】
+- 不要评价对方的工作好不好，保持中立记录者的姿态
+- 不要透露这是 AI，如果对方问起，说"我是访谈助手，专门负责整理案例"
+- 每次回复控制在 100 字以内，保持对话感
+- 不要跳过任何一个维度，哪怕对方回答简短也要追问</pre>
+    </div>
+  </div>
+
+  <!-- 第四步：配置变量 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">4</span>配置变量（运营岗开启访谈前填写）</div>
+    <p>在 Coze 3.0 配置页找到「变量」选项，点击「添加变量」，依次创建以下三个变量：</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>变量名</th>
+          <th>显示名称</th>
+          <th>类型</th>
+          <th>填写示例</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>name</code></td>
+          <td>被访谈人姓名</td>
+          <td>文本</td>
+          <td>张伟</td>
+        </tr>
+        <tr>
+          <td><code>position</code></td>
+          <td>岗位</td>
+          <td>文本</td>
+          <td>咨询顾问 / 营业部经理</td>
+        </tr>
+        <tr>
+          <td><code>topic</code></td>
+          <td>本次访谈主题</td>
+          <td>文本</td>
+          <td>客户转介绍成交案例 / 孤儿单盘活经验</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout info" style="margin-top:12px;">
+      开启每个变量的「用户可填写」开关，访谈链接打开时会先弹出表单让运营岗填写基本信息，填完后才进入对话。
+    </div>
+  </div>
+
+  <!-- 第五步：发布 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">5</span>发布与分发 <span class="new-badge">3.0 渠道扩展</span></div>
+    <ul class="steps">
+      <li><span class="step-dot"></span>配置完成后，点击右上角「发布」</li>
+      <li><span class="step-dot"></span>选择发布渠道（见下方说明）</li>
+      <li><span class="step-dot"></span>发布成功后复制链接或生成二维码</li>
+      <li><span class="step-dot"></span>运营岗打开链接填写被访谈人信息，再将该链接转发给对方</li>
+      <li><span class="step-dot"></span>被访谈人手机打开链接即可开始对话（无需登录账号）</li>
+    </ul>
+
+    <h3 style="margin-top:16px;">Coze 3.0 发布渠道对比</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>渠道</th>
+          <th>适用场景</th>
+          <th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>网页链接</strong></td>
+          <td>最通用，直接发链接给被访谈人</td>
+          <td>推荐首选，无需额外配置</td>
+        </tr>
+        <tr>
+          <td><strong>微信公众号</strong></td>
+          <td>被访谈人直接在公众号对话框访谈</td>
+          <td>需绑定公众号，适合有运营公众号的团队</td>
+        </tr>
+        <tr>
+          <td><strong>飞书机器人</strong></td>
+          <td>内部员工在飞书内完成访谈</td>
+          <td>需要团队使用飞书</td>
+        </tr>
+        <tr>
+          <td><strong>微信客服</strong></td>
+          <td>通过企业微信客服渠道访谈</td>
+          <td>需要企业微信认证</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout tip" style="margin-top:12px;">
+      如果你们有微信公众号"陕耀风华录"，可以将访谈 Bot 直接发布到公众号，被访谈人在公众号对话框里完成访谈，体验更流畅、不需要额外发链接。
+    </div>
+  </div>
+
+  <!-- 第六步：绑定 DeepSeek -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">6</span>绑定 DeepSeek API Key（降低成本）</div>
+    <ul class="steps">
+      <li><span class="step-dot"></span>前往 <strong>platform.deepseek.com</strong> 注册账号，进入「API Keys」生成一个 Key</li>
+      <li><span class="step-dot"></span>回到 coze.cn，进入「账户设置 → 模型供应商 / API 管理」</li>
+      <li><span class="step-dot"></span>找到 DeepSeek，粘贴你的 API Key 并保存</li>
+      <li><span class="step-dot"></span>回到智能体配置，将模型切换为绑定了自有 Key 的 DeepSeek-V3</li>
+    </ul>
+    <div class="callout tip" style="margin-top:12px;">
+      DeepSeek V3 每 100 万 tokens 输入约 1 元。一次完整访谈（20 轮对话 + 生成报告）消耗约 0.03–0.08 元，100 次访谈的模型费用不到 10 元。
+    </div>
+  </div>
+
+  <!-- 上线前检查 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num green">✓</span>上线前检查清单</div>
+    <ul class="checklist">
+      <li><span class="check-icon"></span>已创建团队空间，智能体在空间内</li>
+      <li><span class="check-icon"></span>系统提示词已完整粘贴，包含访谈框架、追问规则和报告生成格式</li>
+      <li><span class="check-icon"></span>三个变量（name / position / topic）已创建并开启「用户可填写」</li>
+      <li><span class="check-icon"></span>自己先模拟一次完整访谈（建议用自己的信息跑一遍），测试追问效果</li>
+      <li><span class="check-icon"></span>发送"生成报告"，确认报告格式正确输出</li>
+      <li><span class="check-icon"></span>用手机测试链接，确认移动端体验正常</li>
+      <li><span class="check-icon"></span>在 Coze 后台确认可以查看「对话记录」</li>
+    </ul>
+  </div>
+
+  <!-- 后续进阶 -->
+  <div class="section">
+    <div class="section-title"><span class="section-num">+</span>后续可以做的进阶配置</div>
+    <ul class="steps">
+      <li><span class="step-dot"></span><strong>多 Agent 分工（Coze 3.0 新能力）</strong>：用一个 Agent 专门负责访谈提问，另一个 Agent 专门负责报告生成，主 Agent 自动调度——分工后两个 Agent 各自优化，报告质量会更稳定</li>
+      <li><span class="step-dot"></span><strong>上传优秀案例作为知识库</strong>：把已有的 2-3 份高质量访谈报告上传到知识库，AI 在追问时能参考同类案例的深度，有效提升新访谈的质量下限</li>
+      <li><span class="step-dot"></span><strong>定时触发器</strong>：Coze 3.0 支持定时任务，可以设置每周五自动提醒还未完成访谈的运营同事跟进</li>
+      <li><span class="step-dot"></span><strong>接入微信公众号</strong>：发布到公众号后，被访谈人直接在公众号聊天完成访谈，无需额外发链接，体验更完整</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+function copyPrompt(btn) {
+  const box = btn.closest('.prompt-box');
+  const pre = box.querySelector('pre');
+  navigator.clipboard.writeText(pre.textContent).then(() => {
+    btn.textContent = '已复制';
+    setTimeout(() => { btn.textContent = '复制'; }, 2000);
+  });
+}
+</script>
+</body>
+</html>

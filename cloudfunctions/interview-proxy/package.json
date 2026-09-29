@@ -1,0 +1,7 @@
+{
+  "name": "interview-proxy",
+  "version": "1.0.0",
+  "description": "DeepSeek proxy for the AI case-interview tool. API key lives in function env vars.",
+  "main": "index.js",
+  "private": true
+}

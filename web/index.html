@@ -1,0 +1,2972 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>平安融易陕分 · 销售团队经验萃取</title>
+<style>
+:root {
+  --bg: oklch(97% 0.005 250);
+  --surface: oklch(100% 0 0);
+  --surface2: oklch(95% 0.008 250);
+  --surface3: oklch(92% 0.01 250);
+  --border: oklch(88% 0.01 250);
+  --border-strong: oklch(80% 0.015 250);
+  --text: oklch(18% 0.02 250);
+  --text-muted: oklch(48% 0.02 250);
+  --text-hint: oklch(65% 0.015 250);
+  --accent: oklch(54% 0.18 248);
+  --accent-hover: oklch(48% 0.18 248);
+  --accent-light: oklch(95% 0.06 248);
+  --accent-text: oklch(36% 0.14 248);
+  --success: oklch(52% 0.16 158);
+  --success-light: oklch(95% 0.05 158);
+  --danger: oklch(52% 0.18 20);
+  --danger-light: oklch(96% 0.05 20);
+  --warning-light: oklch(96% 0.06 75);
+  --warning-text: oklch(40% 0.16 75);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; min-height: 100dvh; }
+
+/* ── screens ── */
+.screen { display: none; min-height: 100dvh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ── setup screen ── */
+#setup-screen {
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.setup-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 32px 28px 28px;
+  width: 100%;
+  max-width: 460px;
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+.brand-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-icon svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+.brand-name { font-size: 16px; font-weight: 500; }
+.brand-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+
+/* ── 续接未完成访谈的提示条 ── */
+.draft-bar {
+  display: none; align-items: center; gap: 10px;
+  background: var(--accent-light);
+  border: 0.5px solid oklch(82% 0.1 248);
+  border-radius: var(--radius);
+  padding: 11px 13px;
+  margin-bottom: 18px;
+}
+.draft-icon {
+  width: 30px; height: 30px; flex-shrink: 0;
+  background: var(--accent); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.draft-icon svg {
+  width: 15px; height: 15px; fill: none; stroke: #fff;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+}
+.draft-body { flex: 1; min-width: 0; }
+.draft-title { font-size: 12.5px; font-weight: 500; color: var(--accent-text); }
+.draft-info {
+  font-size: 11.5px; color: var(--accent-text); opacity: 0.78;
+  margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.draft-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.draft-go {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 6px 12px;
+  font-size: 12px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: background 0.15s; white-space: nowrap;
+}
+.draft-go:hover { background: var(--accent-hover); }
+.draft-drop {
+  background: none; border: 0.5px solid oklch(75% 0.06 248);
+  border-radius: var(--radius-sm); padding: 6px 10px;
+  font-size: 12px; color: var(--accent-text); opacity: 0.75;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.draft-drop:hover { opacity: 1; border-color: var(--accent); }
+
+@media (max-width: 480px) {
+  .draft-bar { flex-wrap: wrap; }
+  .draft-actions { width: 100%; }
+  .draft-actions button { flex: 1; }
+}
+
+.form-group { margin-bottom: 16px; }
+.form-group:last-of-type { margin-bottom: 0; }
+label { display: block; font-size: 12.5px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; }
+label .req { color: var(--danger); margin-left: 2px; }
+input, textarea, select {
+  width: 100%;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, textarea:focus { border-color: var(--accent); background: var(--surface); }
+/* 说明性小字（如"选完自动带出所属中心"） */
+.field-hint { font-size: 11.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.5; }
+/* 只读字段（如自动带出的所属中心）：灰底、不可编辑的观感 */
+input[readonly] { background: var(--surface); color: var(--text-muted); cursor: default; }
+textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
+.input-hint { font-size: 11.5px; color: var(--text-hint); margin-top: 4px; }
+
+.section-sep {
+  display: flex; align-items: center; gap: 10px;
+  margin: 20px 0 16px;
+}
+.section-sep span { font-size: 11.5px; font-weight: 500; color: var(--text-hint); white-space: nowrap; }
+.section-sep::before, .section-sep::after {
+  content: ''; flex: 1; height: 0.5px; background: var(--border);
+}
+
+/* ── 主题快选标签 ── */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip {
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11.5px; color: var(--text-muted);
+  font-family: inherit; cursor: pointer;
+  transition: all 0.15s;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent-light); }
+.chip:active { transform: scale(0.97); }
+
+.apikey-row { display: flex; gap: 8px; }
+.apikey-row input { flex: 1; font-family: "SF Mono", Consolas, monospace; font-size: 12.5px; }
+.icon-btn {
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.icon-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+
+.start-btn {
+  width: 100%;
+  margin-top: 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.start-btn:hover { background: var(--accent-hover); }
+.start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.error-msg {
+  background: var(--danger-light);
+  border: 0.5px solid oklch(82% 0.1 20);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  color: var(--danger);
+  margin-top: 12px;
+  display: none;
+}
+
+/* ── chat screen ── */
+#chat-screen { background: var(--bg); }
+
+.chat-header {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.chat-header-info { flex: 1; min-width: 0; }
+.chat-header-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-header-meta { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-badge {
+  font-size: 11px; font-weight: 500;
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.header-badge.ready {
+  background: var(--success-light);
+  color: var(--success);
+  border-color: oklch(78% 0.1 158);
+}
+.header-btn {
+  background: none; border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 10px; font-size: 12px; color: var(--text-muted); cursor: pointer;
+  font-family: inherit; white-space: nowrap; transition: all 0.15s;
+}
+.header-btn:hover { color: var(--text); border-color: var(--border-strong); }
+.header-btn.not-ready { color: var(--text-hint); border-style: dashed; }
+/* 聊久了把注意力引到「生成报告」：轻微呼吸，不刺眼 */
+.header-btn.nudge {
+  color: var(--accent); border-color: var(--accent);
+  animation: nudgePulse 1.6s ease-in-out infinite;
+}
+@keyframes nudgePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .header-btn.nudge { animation: none; }
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+}
+
+.msg {
+  display: flex;
+  gap: 10px;
+  max-width: 100%;
+  animation: fadeUp 0.18s ease;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.msg.user { flex-direction: row-reverse; }
+
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 500;
+  flex-shrink: 0; margin-top: 2px;
+}
+.avatar.ai { background: var(--accent); color: #fff; }
+.avatar.user-av { background: var(--surface3); color: var(--text-muted); border: 0.5px solid var(--border); }
+
+.bubble {
+  max-width: min(80%, 480px);
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg.ai .bubble {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-top-left-radius: 4px;
+  color: var(--text);
+}
+.msg.user .bubble {
+  background: var(--accent);
+  color: #fff;
+  border-top-right-radius: 4px;
+}
+
+.typing-indicator {
+  display: flex; gap: 4px; align-items: center; padding: 12px 14px;
+}
+.typing-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-hint);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.input-area {
+  background: var(--surface);
+  border-top: 0.5px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+.input-area textarea {
+  flex: 1;
+  min-height: 40px;
+  max-height: 160px;
+  resize: none;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+.input-area textarea:focus { border-color: var(--accent); background: var(--surface); }
+.send-btn {
+  width: 40px; height: 40px;
+  background: var(--accent);
+  border: none; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.send-btn:hover { background: var(--accent-hover); }
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.send-btn svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ─── 语音输入 ───────────────────────────────────────────────
+   按住说话（或点击切换），录完转文字填进输入框，可改可删再发。
+   识别失败不影响打字——麦克风只是输入方式之一，不是唯一通路。 */
+.mic-btn {
+  width: 40px; height: 40px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.mic-btn:hover { background: var(--surface); border-color: var(--accent); }
+.mic-btn svg { width: 17px; height: 17px; fill: none; stroke: var(--text-sub, #6b6b70); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.mic-btn.rec { background: var(--accent); border-color: var(--accent); }
+.mic-btn.rec svg { stroke: #fff; }
+.mic-btn.rec::after {
+  content: ''; position: absolute; inset: -3px;
+  border-radius: inherit; border: 2px solid var(--accent);
+  animation: micPulse 1.2s ease-out infinite;
+}
+@keyframes micPulse {
+  0% { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
+.mic-btn.busy { opacity: 0.55; pointer-events: none; }
+.mic-btn[hidden] { display: none; }
+
+/* 录音/识别浮层：贴在输入区上方，显示状态与实时时长 */
+.mic-bar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 86px; z-index: 60;
+  display: none; align-items: center; gap: 10px;
+  background: rgba(28,28,30,0.94);
+  color: #fff; font-size: 13px;
+  padding: 10px 16px; border-radius: 22px;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.22);
+  max-width: calc(100% - 32px);
+}
+.mic-bar.on { display: flex; }
+.mic-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff453a; animation: micBlink 1s step-end infinite; }
+@keyframes micBlink { 50% { opacity: 0.25; } }
+.mic-bar-text { white-space: nowrap; }
+.mic-bar-hint { opacity: 0.65; font-size: 12px; }
+.mic-bar .mic-cancel {
+  margin-left: 4px; background: rgba(255,255,255,0.14); color: #fff;
+  border: none; border-radius: 14px; padding: 4px 11px; font-size: 12px; cursor: pointer;
+}
+
+.report-trigger {
+  text-align: center;
+  padding: 0 16px 4px;
+  flex-shrink: 0;
+}
+.report-trigger button {
+  background: none; border: 0.5px dashed var(--border-strong);
+  border-radius: var(--radius-sm); padding: 7px 16px;
+  font-size: 12.5px; color: var(--text-muted); cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.report-trigger button:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent-light); }
+
+/* ── report screen ── */
+#report-screen { padding: 0; }
+
+.report-header {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.report-header h2 { font-size: 15px; font-weight: 500; flex: 1; }
+.report-header .back-btn {
+  background: none; border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 12px; font-size: 12.5px; color: var(--text-muted); cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.report-header .back-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+.copy-all-btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 7px 14px;
+  font-size: 12.5px; font-weight: 500; font-family: inherit; cursor: pointer;
+  transition: background 0.15s;
+}
+.copy-all-btn:hover { background: var(--accent-hover); }
+
+.archive-btn {
+  background: var(--surface); color: var(--accent-text);
+  border: 0.5px solid oklch(82% 0.1 248);
+  border-radius: var(--radius-sm); padding: 7px 14px;
+  font-size: 12.5px; font-weight: 500; font-family: inherit; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.archive-btn:hover { background: var(--accent-light); }
+.archive-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.archive-btn.done {
+  background: var(--success-light); color: var(--success);
+  border-color: oklch(82% 0.1 158); cursor: default;
+}
+.archive-status { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.archive-status.err { color: var(--danger); }
+.archive-status.ok { color: var(--success); }
+
+.report-body {
+  flex: 1; overflow-y: auto; padding: 24px 20px 48px;
+  max-width: 680px; margin: 0 auto; width: 100%;
+}
+.report-meta {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-label { font-size: 11px; font-weight: 500; color: var(--text-hint); letter-spacing: 0.03em; text-transform: uppercase; }
+.meta-value { font-size: 13.5px; color: var(--text); font-weight: 500; }
+
+.report-section {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+}
+.report-section h3 {
+  font-size: 13.5px; font-weight: 500; color: var(--accent-text);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.report-section h3::before {
+  content: attr(data-num);
+  width: 20px; height: 20px;
+  background: var(--accent-light);
+  border: 0.5px solid oklch(82% 0.1 248);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; color: var(--accent);
+  flex-shrink: 0;
+}
+.report-section .content {
+  font-size: 13.5px; line-height: 1.75; color: var(--text);
+  word-break: break-word;
+}
+/* 经验条目：整条做成卡片，让「做法」和「具体怎么做」的层级一眼可见 */
+.exp-item {
+  background: var(--surface2);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 11px 13px;
+}
+.exp-item + .exp-item { margin-top: 9px; }
+.exp-lead { font-size: 13.5px; font-weight: 500; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+.exp-body { margin-top: 7px; display: flex; flex-direction: column; gap: 5px; }
+.exp-step { display: flex; gap: 8px; font-size: 13px; line-height: 1.7; align-items: flex-start; }
+.exp-step .k {
+  flex-shrink: 0;
+  background: var(--accent-light); color: var(--accent-text);
+  border-radius: 4px; padding: 1px 6px; margin-top: 3px;
+  font-size: 10.5px; font-weight: 500; white-space: nowrap;
+}
+.exp-step .v { flex: 1; min-width: 0; white-space: pre-wrap; }
+/* 普通行：编号项与无编号正文 */
+.report-section .content .ln { white-space: pre-wrap; }
+.report-section .content .ln + .ln { margin-top: 5px; }
+.report-section .content .ln.num { padding-left: 2px; }
+/* 报告页面上的提示条（信息量不足 / 未回答的追问） */
+.report-alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  border-radius: var(--radius);
+  padding: 12px 14px; margin-bottom: 12px;
+  font-size: 12.5px; line-height: 1.7;
+}
+.report-alert.warn { background: var(--warning-light); color: var(--warning-text); }
+.report-alert.info { background: var(--accent-light); color: var(--accent-text); }
+.report-alert .ico { flex-shrink: 0; font-weight: 600; }
+.report-alert .txt { flex: 1; min-width: 0; }
+.report-alert .txt b { font-weight: 600; }
+/* 六个内容维度的覆盖度体检条 */
+.cov-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px;
+}
+.cov-head { font-size: 12.5px; font-weight: 600; margin-bottom: 10px; }
+.cov-head.ok { color: var(--success-text, #1a7f4b); }
+.cov-head.gap { color: var(--warning-text); }
+.cov-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.cov-chip {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  border-radius: 8px; padding: 8px 10px;
+  font-size: 12px; line-height: 1.5;
+}
+.cov-chip.ok { background: rgba(26,127,75,.08); border: 1px solid rgba(26,127,75,.22); }
+.cov-chip.gap { background: var(--warning-light); border: 1px dashed rgba(180,120,20,.35); }
+.cov-mark { font-weight: 700; flex-shrink: 0; }
+.cov-chip.ok .cov-mark { color: #1a7f4b; }
+.cov-chip.gap .cov-mark { color: var(--warning-text); }
+.cov-label { font-weight: 600; }
+.cov-note { flex: 1 1 100%; font-size: 11.5px; opacity: .78; }
+/* 报告生成前的「素材信息量」提示 */
+.gate-panel {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px; margin-bottom: 12px;
+}
+.gate-title { font-size: 14px; font-weight: 500; margin-bottom: 6px; color: var(--warning-text); }
+.gate-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.8; margin-bottom: 14px; }
+.gate-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.stat {
+  flex: 1; min-width: 104px;
+  background: var(--surface2); border-radius: var(--radius-sm);
+  padding: 9px 11px;
+}
+.stat-label { font-size: 11px; color: var(--text-hint); }
+.stat-val { font-size: 15px; font-weight: 500; margin-top: 1px; }
+.stat-val.bad { color: var(--warning-text); }
+.stat-val.good { color: var(--success); }
+.gate-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.gate-actions button {
+  border-radius: var(--radius-sm); padding: 8px 15px;
+  font-size: 12.5px; font-weight: 500; font-family: inherit; cursor: pointer;
+  transition: all 0.15s;
+}
+.gate-actions .primary { background: var(--accent); color: #fff; border: none; }
+.gate-actions .primary:hover { background: var(--accent-hover); }
+.gate-actions .ghost { background: none; border: 0.5px solid var(--border-strong); color: var(--text-muted); }
+.gate-actions .ghost:hover { border-color: var(--accent); color: var(--accent-text); }
+.report-generating {
+  display: flex; align-items: center; gap: 10px;
+  padding: 20px;
+  color: var(--text-muted); font-size: 13.5px;
+}
+
+.loading-dots { display: flex; gap: 4px; }
+.loading-dots span {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent); opacity: 0.3;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── responsive ── */
+@media (max-width: 480px) {
+  .setup-card { padding: 24px 20px 20px; }
+  .report-meta { grid-template-columns: 1fr; }
+  .bubble { max-width: 92%; }
+}
+
+/* ── 版本标记 ── */
+.build-stamp {
+  margin-top: 12px; text-align: center;
+  font-size: 11.5px; color: var(--text-hint); letter-spacing: .2px;
+}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ file:// 环境警告（App 内置文件预览） ═══════════
+     WorkBuddy 等 App 会把页面下载到本地用 file:// 打开做「预览」，
+     该环境被浏览器安全策略禁止一切网络请求（对话/提交/语音全废），
+     且麦克风可能可用导致问题更隐蔽。检测到就地警告并引导换浏览器。 -->
+<div id="file-proto-warn" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;
+     background:#3a1212;color:#ffd9d9;padding:12px 14px;font-size:14px;line-height:1.7;
+     border-bottom:2px solid #ff5c5c;">
+  <b style="color:#ff8a8a">⚠️ 当前打开方式无效</b><br>
+  你是在 App 内置预览（本地文件）里打开的，此环境禁止访问网络，对话和语音都无法使用。<br>
+  请<b>复制网址到手机浏览器（Edge / Chrome / 系统浏览器）的地址栏</b>打开：
+  <div style="margin-top:6px;padding:8px 10px;background:#241010;border-radius:8px;
+       font-family:monospace;user-select:all;-webkit-user-select:all">work-d1gs0jzrg2277d75e-1391683363.tcloudbaseapp.com</div>
+</div>
+
+<!-- ═══════════════ SETUP SCREEN ═══════════════ -->
+<div id="setup-screen" class="screen active">
+  <div class="setup-card">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">平安融易陕分 · 销售团队经验萃取</div>
+        <div class="brand-sub">访谈由 AI 主持 · 结束后自动生成案例报告</div>
+      </div>
+    </div>
+
+    <div class="draft-bar" id="draft-bar">
+      <div class="draft-icon">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l3 2"/></svg>
+      </div>
+      <div class="draft-body">
+        <div class="draft-title">检测到未完成的访谈</div>
+        <div class="draft-info" id="draft-info">—</div>
+      </div>
+      <div class="draft-actions">
+        <button class="draft-go" onclick="resumeDraft()">继续访谈</button>
+        <button class="draft-drop" onclick="discardDraft()">放弃</button>
+      </div>
+    </div>
+
+    <div class="section-sep"><span>被访谈人信息</span></div>
+
+    <div class="form-group">
+      <label>姓名 <span class="req">*</span></label>
+      <input type="text" id="f-name" placeholder="例：张伟" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>UM 号 <span class="req">*</span></label>
+      <input type="text" id="f-um" placeholder="被访谈人的员工 UM 号" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>本次访谈主题 <span class="req">*</span></label>
+      <textarea id="f-topic" placeholder="例：客户转介绍成交案例&#10;孤儿单盘活经验&#10;新人快速签约方法"></textarea>
+      <div class="chips" id="topic-chips">
+        <button class="chip" onclick="pickTopic(this)">客户转介绍</button>
+        <button class="chip" onclick="pickTopic(this)">孤儿单盘活</button>
+        <button class="chip" onclick="pickTopic(this)">批款后的跟进与服务</button>
+        <button class="chip" onclick="pickTopic(this)">高件均客户开发</button>
+        <button class="chip" onclick="pickTopic(this)">被拒客户的二次挽回</button>
+        <button class="chip" onclick="pickTopic(this)">渠道/存量客户经营</button>
+      </div>
+    </div>
+
+    <div class="section-sep"><span>归档信息</span></div>
+
+    <div class="form-group">
+      <label>后线对接人（= 发起本次萃取的运营岗） <span class="req">*</span></label>
+      <select id="f-owner">
+        <option value="">请选择</option>
+      </select>
+      <div class="field-hint">选好了下面的所属中心会自动带出。名单里没有的人选「其他」，再手动填写。</div>
+    </div>
+    <div class="form-group">
+      <label>对接人所属中心</label>
+      <input type="text" id="f-owner-org" placeholder="选择对接人后自动带出" autocomplete="off" readonly>
+    </div>
+    <div class="form-group" id="g-owner-custom-name" style="display:none">
+      <label>对接人姓名 <span class="req">*</span></label>
+      <input type="text" id="f-owner-custom" placeholder="请填写对接人姓名" autocomplete="off">
+    </div>
+    <div class="form-group" id="g-owner-custom-org" style="display:none">
+      <label>对接人所属中心 <span class="req">*</span></label>
+      <input type="text" id="f-owner-custom-org" placeholder="例：西安第一咨询中心" autocomplete="off">
+    </div>
+
+    <div id="apikey-section">
+    <div class="section-sep"><span>模型配置</span></div>
+
+    <div class="form-group">
+      <label>DeepSeek API Key <span class="req">*</span></label>
+      <div class="apikey-row">
+        <input type="password" id="f-apikey" placeholder="sk-..." autocomplete="off">
+        <button class="icon-btn" id="toggle-key" title="显示/隐藏">
+          <svg id="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">Key 仅保存在本地浏览器，不上传任何服务器。申请地址：platform.deepseek.com</div>
+    </div>
+    </div>
+
+    <div id="setup-error" class="error-msg"></div>
+
+    <button class="start-btn" id="start-btn" onclick="startInterview()">开始访谈</button>
+    <div class="build-stamp" id="build-stamp" title="页面版本号。同事反馈功能不对时，让他把这行报给你">—</div>
+  </div>
+</div>
+
+<!-- ═══════════════ CHAT SCREEN ═══════════════ -->
+<div id="chat-screen" class="screen">
+  <div class="chat-header">
+    <div class="chat-header-info">
+      <div class="chat-header-name" id="header-name">—</div>
+      <div class="chat-header-meta" id="header-meta">—</div>
+    </div>
+    <span class="header-badge" id="round-badge">访谈进行中</span>
+    <button class="header-btn" id="report-btn" onclick="endAndReport()">生成报告</button>
+    <button class="header-btn" onclick="resetToSetup()">重置</button>
+  </div>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="report-trigger" id="report-trigger">
+    <button id="report-trigger-btn" onclick="endAndReport()">访谈已充分 · 点此生成案例报告 →</button>
+  </div>
+
+  <div class="input-area">
+    <textarea id="user-input" placeholder="输入回复…" rows="1"
+      onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="mic-btn" id="mic-btn" hidden onclick="micToggle()" title="语音输入（点一下开始，再点结束）">
+      <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>
+    </button>
+    <button class="send-btn" id="send-btn" onclick="sendMessage()" title="发送">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- 录音/识别状态浮层 -->
+<div class="mic-bar" id="mic-bar">
+  <span class="mic-dot"></span>
+  <span class="mic-bar-text" id="mic-bar-text">正在录音…</span>
+  <span class="mic-bar-hint" id="mic-bar-hint">再点一下麦克风结束</span>
+  <button class="mic-cancel" id="mic-cancel" onclick="micCancel()">取消</button>
+</div>
+
+<!-- ═══════════════ REPORT SCREEN ═══════════════ -->
+<div id="report-screen" class="screen">
+  <div class="report-header">
+    <button class="back-btn" onclick="backToChat()">← 返回访谈</button>
+    <h2>案例经验报告</h2>
+    <button class="copy-all-btn" id="copy-all-btn" onclick="copyReport()">复制报告</button>
+    <button class="archive-btn" id="archive-btn" onclick="submitArchive()">提交归档</button>
+    <span class="archive-status" id="archive-status"></span>
+  </div>
+  <div class="report-body">
+    <div class="report-meta" id="report-meta"></div>
+    <div id="report-alerts"></div>
+    <div id="report-coverage"></div>
+    <div id="report-content"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════ 启动期错误捕获（最先注册，必须在所有代码之前）═══════
+   若主脚本在任意一行抛异常，其后所有 const/let/function 声明都不生效
+   （脚本已终止），表现是「页面看起来正常但功能全废」。
+   把真实错误显示在顶部红条上，便于手机端截图定位（手机无法看 console）。
+   用户若看到红条，请连同内容一起反馈 —— 它就是根因。 */
+(function () {
+  var bar = null;
+  function ensure() {
+    if (bar) return bar;
+    bar = document.createElement('div');
+    bar.id = 'app-err-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7a1010;' +
+      'color:#ffdede;padding:8px 12px;font:11px/1.5 monospace;max-height:40vh;overflow-y:auto;' +
+      'white-space:pre-wrap;word-break:break-all;border-bottom:2px solid #ff4040';
+    try { (document.body || document.documentElement).appendChild(bar); } catch (e) {}
+    return bar;
+  }
+  function show(kind, text) {
+    try {
+      var b = ensure();
+      var d = document.createElement('div');
+      d.textContent = '[' + kind + '] ' + text;
+      b.appendChild(d);
+    } catch (e) {}
+  }
+  window.addEventListener('error', function (ev) {
+    var t = ev.target;
+    if (t && t !== window && (t.tagName === 'IMG' || t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+      show('资源加载失败', (t.tagName || '') + ' ' + (t.src || t.href || ''));
+      return;
+    }
+    show('JS错误', (ev.message || '(no msg)') + ' @ 行' + ev.lineno + ':' + ev.colno);
+  }, true);
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason || {};
+    show('Promise未捕获', (r.name || 'Error') + ': ' + (r.message || String(r)));
+  });
+  window.__appStartTs = Date.now();
+  window.__appBooted = false;   /* 主脚本末尾置 true；仍为 false = 主脚本没跑完 */
+})();
+
+// ─── 部署配置 ─────────────────────────────────────────
+// 后端代理地址：API Key 保存在云函数环境变量中，前端源码不含任何密钥
+const PROXY_URL = 'https://work-d1gs0jzrg2277d75e-1391683363.ap-shanghai.app.tcloudbase.com/api/chat';
+
+// 留空即正常部署状态；仅本地离线自测时才需要填
+const BUILT_IN_API_KEY = '';
+
+/* 程序版本标记。每次改动页面后手动 +1 位（a→b→c…，跨日换日期）。
+   用途：手机上缓存极难清，同事说"看不到新功能"时，
+   让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
+   改这里的同时记得同步 admin.html 的同名常量。 */
+const APP_BUILD = 'v2026.09.29-m';
+
+/* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
+if (typeof location !== 'undefined' && location.protocol === 'file:') {
+  const fw = document.getElementById('file-proto-warn');
+  if (fw) fw.style.display = 'block';
+}
+// ──────────────────────────────────────────────────────
+
+/* ═══════════════ 语音输入（录音 → 腾讯云一句话识别 → 填进输入框） ═══════════════
+   为什么不用 MediaRecorder：它默认产 webm，而腾讯云一句话识别只收
+   wav/pcm/mp3/m4a/aac/amr —— 所以这里自己采 PCM，再手工包一层 WAV 头。
+   识别失败不影响打字：麦克风只是输入方式之一，出任何问题都优雅降级。 */
+const ASR_MAX_MS = 55000;        // 自动停在上限前留缓冲（官方硬限 60 秒）
+const ASR_SAMPLE_RATE = 16000;   // 官方要求 16kHz
+
+let micState = 'idle';           // idle | recording | working
+let micCtx = null, micStream = null, micNode = null, micSource = null;
+let micChunks = [], micStartedAt = 0, micTimer = null, micCancelled = false;
+
+/* 轻提示：录音相关的报错走页面内浮层，不打断用户（不用 alert 弹窗） */
+function micToast(msg, isErr) {
+  if (!msg) return;
+  let el = document.getElementById('mic-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'mic-toast';
+    el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:132px;z-index:70;' +
+      'max-width:calc(100% - 40px);background:rgba(28,28,30,0.94);color:#fff;font-size:13px;' +
+      'padding:9px 15px;border-radius:12px;box-shadow:0 5px 18px rgba(0,0,0,0.2);' +
+      'transition:opacity .25s;opacity:0;text-align:center;line-height:1.45;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(function () { el.style.opacity = '0'; }, isErr ? 4200 : 2400);
+}
+
+/* 麦克风按钮只在浏览器支持录音时才显示——老浏览器静默隐藏，不报错 */
+function initMic() {
+  const btn = document.getElementById('mic-btn');
+  const ok = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia &&
+                (window.AudioContext || window.webkitAudioContext));
+  if (btn && ok) btn.hidden = false;
+}
+
+/* 把任意采样率的 Float32 分片线性重采样到 16kHz。
+   ★ 手机麦克风原生常是 44.1k/48k：不重采样的话
+   ① 头部采样率不是 16k，腾讯云一句话识别会拒；
+   ② 48kHz 录 30 秒 ≈ 2.9MB 原始数据 → base64 约 5.8MB，超 3MB 上限，
+      且请求体过大时网关会直接断连（前端只能看到「网络异常」）。 */
+function resampleTo16k(chunks, inRate) {
+  let total = 0;
+  for (let i = 0; i < chunks.length; i++) total += chunks[i].length;
+  if (!total) return new Float32Array(0);
+  const outRate = ASR_SAMPLE_RATE;
+  /* ★ 采样率兜底：某些浏览器 AudioContext.sampleRate 可能为 0/undefined/异常值，
+     直接用会算出 Infinity 长度 → RangeError。非法值一律按 16k 处理（不重采样）。 */
+  if (!isFinite(inRate) || inRate < 4000 || inRate > 384000) inRate = outRate;
+  if (inRate === outRate) {
+    const same = new Float32Array(total);
+    let o = 0;
+    for (let i = 0; i < chunks.length; i++) { same.set(chunks[i], o); o += chunks[i].length; }
+    return same;
+  }
+  // 先合并成一条连续信号，再按输出点数线性插值
+  const src = new Float32Array(total);
+  let off = 0;
+  for (let i = 0; i < chunks.length; i++) { src.set(chunks[i], off); off += chunks[i].length; }
+  const outLen = Math.max(1, Math.floor(total * outRate / inRate));
+  const dst = new Float32Array(outLen);
+  const ratio = inRate / outRate;
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos);
+    const i1 = Math.min(i0 + 1, total - 1);
+    const frac = pos - i0;
+    dst[i] = src[i0] * (1 - frac) + src[i1] * frac;
+  }
+  return dst;
+}
+
+/* 把 Float32 采样转成 16bit 单声道 PCM，再包 WAV 头 → base64 */
+function pcmToWavBase64(chunks, sampleRate) {
+  let total = 0;
+  for (let i = 0; i < chunks.length; i++) total += chunks[i].length;
+  const buf = new ArrayBuffer(44 + total * 2);
+  const view = new DataView(buf);
+  const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + total * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);        // fmt chunk 大小
+  view.setUint16(20, 1, true);         // PCM
+  view.setUint16(22, 1, true);         // 单声道
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // 字节率
+  view.setUint16(32, 2, true);         // block align
+  view.setUint16(34, 16, true);        // 位深
+  writeStr(36, 'data');
+  view.setUint32(40, total * 2, true);
+  let off = 44;
+  for (let i = 0; i < chunks.length; i++) {
+    const c = chunks[i];
+    for (let j = 0; j < c.length; j++) {
+      let s = Math.max(-1, Math.min(1, c[j]));
+      view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      off += 2;
+    }
+  }
+  const bytes = new Uint8Array(buf);
+  /* ★ 不用 String.fromCharCode.apply(null, chunk)：一次传 3 万多个参数
+     在手机上会 RangeError（Maximum call stack size exceeded），录音越长越必炸。
+     改成逐字节查表，零栈风险、速度也够（16k 录 60 秒 = 192 万字节）。 */
+  return bytesToBase64(bytes);
+}
+
+/* 安全的 Uint8Array → base64：逐字节查表，不用 apply、不用展开运算符 */
+const B64_TAB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function bytesToBase64(bytes) {
+  let out = '';
+  const len = bytes.length;
+  for (let i = 0; i < len; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < len ? bytes[i + 1] : 0;
+    const b2 = i + 2 < len ? bytes[i + 2] : 0;
+    out += B64_TAB[b0 >> 2];
+    out += B64_TAB[((b0 & 3) << 4) | (b1 >> 4)];
+    out += i + 1 < len ? B64_TAB[((b1 & 15) << 2) | (b2 >> 6)] : '=';
+    out += i + 2 < len ? B64_TAB[b2 & 63] : '=';
+  }
+  return out;
+}
+
+function micBar(on, text, hint) {
+  const bar = document.getElementById('mic-bar');
+  if (!bar) return;
+  bar.classList.toggle('on', !!on);
+  if (on) {
+    if (text) document.getElementById('mic-bar-text').textContent = text;
+    if (hint !== undefined) document.getElementById('mic-bar-hint').textContent = hint;
+    document.getElementById('mic-cancel').style.display = micState === 'recording' ? '' : 'none';
+  }
+}
+
+function micSecs() {
+  return Math.min(99, Math.floor((Date.now() - micStartedAt) / 1000));
+}
+
+function micToggle() {
+  if (micState === 'working') return;
+  if (micState === 'idle') micStart();
+  else micStop(false);
+}
+
+function micStart() {
+  micCancelled = false;
+  navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  }).then(function (stream) {
+    micStream = stream;
+    micCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const rate = micCtx.sampleRate || ASR_SAMPLE_RATE;
+    /* ★ 诊断留痕：真机上把关键参数打出来，排障不用猜 */
+    try { console.log('[语音识别] 开始录音：AudioContext.sampleRate=' + micCtx.sampleRate
+      + ' 实际采用=' + rate + ' state=' + micCtx.state); } catch (e) {}
+    micSource = micCtx.createMediaStreamSource(stream);
+    /* ScriptProcessor 已废弃但兼容性最好；Safari 需要 4096 的块大小才回调稳定 */
+    micNode = micCtx.createScriptProcessor(4096, 1, 1);
+    micChunks = [];
+    micNode.onaudioprocess = function (e) {
+      if (micCancelled) return;
+      micChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    };
+    micSource.connect(micNode);
+    micNode.connect(micCtx.destination);   // 部分浏览器不连 destination 不回调
+    micStartedAt = Date.now();
+    micInputRate = rate;
+    micState = 'recording';
+    document.getElementById('mic-btn').classList.add('rec');
+    micBar(true, '正在录音… 0 秒', '再点一下麦克风结束');
+    micTimer = setInterval(function () {
+      const s = micSecs();
+      document.getElementById('mic-bar-text').textContent = '正在录音… ' + s + ' 秒';
+      if (Date.now() - micStartedAt >= ASR_MAX_MS) micStop(false);  // 自动停，留足安全余量
+    }, 250);
+  }).catch(function (err) {
+    micState = 'idle';
+    const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+    micToast(denied ? '麦克风权限被拒绝，请在浏览器设置里允许后重试' : '无法访问麦克风：' + (err && err.message ? err.message : err), true);
+  });
+}
+let micInputRate = ASR_SAMPLE_RATE;
+
+function micStop(cancelled) {
+  if (micState !== 'recording') return;
+  micCancelled = !!cancelled;
+  micState = 'working';
+  clearInterval(micTimer);
+  document.getElementById('mic-btn').classList.remove('rec');
+  document.getElementById('mic-btn').classList.add('busy');
+
+  try { if (micNode) { micNode.onaudioprocess = null; micNode.disconnect(); } } catch (e) {}
+  try { if (micSource) micSource.disconnect(); } catch (e) {}
+  try { if (micCtx) micCtx.close(); } catch (e) {}
+  try { if (micStream) micStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+  micNode = micSource = micCtx = micStream = null;
+
+  const chunks = micChunks; micChunks = [];
+  const durationMs = Date.now() - micStartedAt;
+
+  if (cancelled) {
+    micState = 'idle';
+    document.getElementById('mic-btn').classList.remove('busy');
+    micBar(false);
+    return;
+  }
+  if (durationMs < 600) {
+    micState = 'idle';
+    document.getElementById('mic-btn').classList.remove('busy');
+    micBar(false);
+    micToast('说话时间太短，请按住多说几个字', true);
+    return;
+  }
+
+  micBar(true, '正在识别…', '请稍候');
+  let base64;
+  try {
+    /* ★ 必须重采样到 16kHz 再包 WAV（见 resampleTo16k 注释） */
+    const pcm16k = resampleTo16k(chunks, micInputRate);
+    base64 = pcmToWavBase64([pcm16k], ASR_SAMPLE_RATE);
+    /* 诊断：录音采集是否正常（chunks 为空说明 onaudioprocess 没回调） */
+    console.log('[语音识别] 采集诊断：chunks=' + chunks.length
+      + ' 采样点=' + (function () { let t = 0; for (let i = 0; i < chunks.length; i++) t += chunks[i].length; return t; })()
+      + ' inRate=' + micInputRate + ' 重采样后=' + pcm16k.length + ' b64=' + base64.length);
+  } catch (e) {
+    micFinish('录音数据处理失败 [' + (e && e.name) + '/' + Math.round(micInputRate) + ']', true);
+    return;
+  }
+  /* ★ 采集为空 / 重采样后为空 → 明确提示，别让空音频发到服务端再报莫名其妙的错 */
+  if (!base64 || base64.length < 200) {
+    micFinish('没有采到声音 [采集' + chunks.length + '块/输入率' + Math.round(micInputRate) + ']，请重试', true);
+    return;
+  }
+
+  /* ★ 前置大小检查。两条硬线（2026-09-29 实测）：
+     - 腾讯云 ASR 只收 ≤3MB 原始音频（base64 后约 4MB）
+     - CloudBase 网关对请求体有硬上限，实测 **>5.5MB 直接回 406 + 空响应体**
+       （前端只能看到「网络异常」，因为空 body 连 JSON 都解析不了）
+     重采样到 16kHz 后，60 秒录音仅约 1.9MB，远在两条线以内；
+     这里再兜一道 3.6MB（≈2.7MB 音频），留足安全余量。 */
+  const MAX_B64_LEN = 3600000;
+  if (base64.length > MAX_B64_LEN) {
+    micFinish('这段录音太长了，请分几次说（每次控制在 50 秒内）', true);
+    return;
+  }
+
+  /* ★ 手机网络慢 + 音频体量大，必须给足时间；同时要有超时兜底，
+     否则 fetch 会一直挂着、用户看到按钮一直转圈。 */
+  const b64KB = Math.round(base64.length / 1024);
+  const sendAt = Date.now();
+  micBar(true, '正在识别…', '已上传 0KB / ' + b64KB + 'KB');
+
+  /* ★ 阶段性上报：让用户和排障者都能看见卡在哪一步。
+     手机上看不到 console，所以进度直接写在浮层里。 */
+  let uploading = true;
+  const prog = setInterval(function () {
+    if (!uploading) return;
+    const el = document.getElementById('mic-bar-hint');
+    if (el) el.textContent = '等待服务器响应…（' + Math.round((Date.now() - sendAt) / 1000) + '秒）';
+  }, 1000);
+
+  function doFetch(attempt) {
+    const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const asrTimer = setTimeout(function () { if (ctl) ctl.abort(); }, 45000);
+    return fetch(apiUrl('/asr'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio_base64: base64, format: 'wav', duration_ms: durationMs, sample_rate: ASR_SAMPLE_RATE }),
+      signal: ctl ? ctl.signal : undefined,
+    }).then(function (r) {
+      clearTimeout(asrTimer);
+      /* ★ 服务端返回非 JSON（如网关 413/502 的 HTML 错误页）时 r.json() 会抛错，
+         若直接落到 catch 就会被误报成「网络异常」。这里先取文本，能解析才当 JSON。 */
+      return r.text().then(function (t) {
+        let j = null;
+        try { j = JSON.parse(t); } catch (e) {}
+        return { status: r.status, body: j, raw: t, attempt: attempt };
+      });
+    }, function (err) {
+      clearTimeout(asrTimer);
+      /* ★ 网络层失败自动重试一次（仅对非主动中止的错误）。
+         移动网络首次请求常常因为 DNS/连接复用失败，重试一次能救回大部分。 */
+      if (attempt < 2 && !(err && err.name === 'AbortError')) {
+        micBar(true, '网络不稳，正在重试…', '第 2 次尝试');
+        return new Promise(function (res) { setTimeout(res, 800); })
+          .then(function () { return doFetch(attempt + 1); });
+      }
+      throw err;
+    });
+  }
+
+  doFetch(1).then(function (res) {
+    uploading = false; clearInterval(prog);
+    if (res.status === 200 && res.body && res.body.ok) {
+      const text = String(res.body.text || '').trim();
+      if (!text) { micFinish('没听清，请再说一遍', true); return; }
+      micApplyText(text);
+      micFinish('');
+      return;
+    }
+    if (res.body && res.body.error) {
+      micFinish(asrErrText(res.body), true);
+      return;
+    }
+    /* 走到这里说明网关层就拒了（没到业务代码） */
+    if (res.status === 413) { micFinish('录音太长了，请分几次说（每次控制在 50 秒内）', true); return; }
+    /* ★ 406 是 CloudBase 网关的「请求体超限」信号（空 body，实测 >5.5MB 触发）。
+       必须单独认出来，否则会掉到下面笼统的「识别失败」。 */
+    if (res.status === 406) { micFinish('录音太长了，请分几次说（每次控制在 50 秒内）', true); return; }
+    if (res.status === 404) { micFinish('语音服务未部署（路由缺失），请先手动输入', true); return; }
+    if (res.status === 503) { micFinish('语音识别尚未开通，请先手动输入', true); return; }
+    micFinish('识别失败（HTTP ' + res.status + '），请改用手动输入', true);
+  }).catch(function (err) {
+    uploading = false; clearInterval(prog);
+    /* ★ 区分「真的断网」和「我们自己超时中止」，别一律甩「网络异常」。 */
+    const aborted = err && (err.name === 'AbortError');
+    /* ★ 诊断码直接进提示文案：用户截图即可定位，无需连电脑看 console。
+       E1=请求被中断/断网 E2=超时中止 E4=其它；后接 err.name、cause.code、体积、时长。 */
+    const cause = err && err.cause ? (err.cause.code || err.cause.message || '') : '';
+    const nm = (err && err.name) ? String(err.name) : '?';
+    const msg = String((err && err.message) || '');
+    let code = 'E4';
+    if (aborted) code = 'E2';
+    else if (/Failed to fetch|NetworkError|Load failed|Network request failed/i.test(nm + ' ' + msg)) code = 'E1';
+    const diag = code + '·' + nm + (cause ? '/' + cause : '')
+      + '·' + Math.round((base64 ? base64.length : 0) / 1024) + 'KB'
+      + '·' + Math.round(durationMs / 1000) + 's'
+      + '·耗时' + Math.round((Date.now() - sendAt) / 1000) + 's';
+    if (aborted) {
+      micFinish('识别超时（网络较慢），请重试 [' + diag + ']', true);
+    } else {
+      micFinish('网络异常，识别失败 [' + diag + ']', true);
+    }
+    /* 把真实原因留在控制台，便于远程排障（同一 WiFi 下用 vConsole 就能看到） */
+    try {
+      console.warn('[语音识别] 请求失败：name=' + nm + ' msg=' + msg
+        + ' cause=' + (cause || '-')
+        + ' b64Len=' + (base64 ? base64.length : 0) + ' dur=' + durationMs + 'ms url=' + apiUrl('/asr'));
+    } catch (e) {}
+  });
+}
+
+function asrErrText(b) {
+  const e = (b && b.error) || '';
+  if (e === 'asr_not_configured') return '语音识别尚未开通，请先手动输入';
+  if (e === 'asr_audio_too_long') return '录音超过 60 秒，请分段说';
+  if (e === 'asr_audio_too_large') return '录音文件过大，请缩短时长';
+  if (e === 'asr_timeout' || e === 'asr_network_error') return '识别超时，请重试';
+  if (e === 'asr_api_error') return '识别服务返回错误：' + ((b && b.detail) || '');
+  return '识别失败，请改用手动输入';
+}
+
+/* 把识别结果追加到输入框（不覆盖已打好的字），并触发自适应高度 */
+function micApplyText(text) {
+  const ta = document.getElementById('user-input');
+  if (!ta) return;
+  const cur = ta.value;
+  const sep = cur && !/\s$/.test(cur) ? '' : '';
+  ta.value = cur ? cur + sep + text : text;
+  ta.focus();
+  try { autoResize(ta); } catch (e) {}
+  // 光标移到末尾
+  try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (e) {}
+}
+
+function micFinish(errMsg, isErr) {
+  micState = 'idle';
+  const btn = document.getElementById('mic-btn');
+  btn.classList.remove('busy', 'rec');
+  micBar(false);
+  if (errMsg) micToast(errMsg, !!isErr);
+}
+
+function micCancel() {
+  if (micState === 'recording') micStop(true);
+}
+
+/* ─── 后线对接人名单（= 运营岗）─────────────────────────
+   这个字段是归因键：它决定了报告发给谁、也决定了这次萃取算谁的产出。
+   之前是自由文本，顾问常写成"李经理"「王姐」或直接填工号，
+   归因就断了。改成下拉选择，选人自动带出所属中心。
+   名单变动直接改这里（按「姓名|所属中心」一行一个）。
+   ────────────────────────────────────────────────────── */
+const OWNER_LIST = [
+  '王珍|西安第一咨询中心',
+  '鲁佳梅|西安第二咨询中心',
+  '魏婷|西安第三咨询中心',
+  '赵婕|西安第四咨询中心',
+  '田敏|西安第三咨询中心',
+  '王禹森|宝鸡中心',
+  '曹亚妮|榆林中心',
+  '刘龙刚|咸阳中心',
+];
+
+/* 名单之外的人走「其他」分支：选它才露出两个手填框。
+   名单本身仍要保持与库中归因键一致，不能让自由文本混进正常路径。 */
+const OWNER_OTHER = '__other__';
+
+function fillOwnerOptions() {
+  const sel = document.getElementById('f-owner');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">请选择</option>' + OWNER_LIST.map(item => {
+    const [name, org] = item.split('|');
+    return '<option value="' + escHtml(name) + '" data-org="' + escHtml(org || '') + '">'
+      + escHtml(name) + '（' + escHtml(org || '未填中心') + '）</option>';
+  }).join('') + '<option value="' + OWNER_OTHER + '">其他（手动填写）</option>';
+  // 恢复上次选择的对接人：同一批萃取往往只找同一个人，省得每次重选
+  let last = '';
+  try { last = localStorage.getItem('last_owner') || ''; } catch (e) {}
+  if (last === OWNER_OTHER) {
+    sel.value = OWNER_OTHER;
+    syncOwnerOrg();
+  } else if (last && OWNER_LIST.some(i => i.split('|')[0] === last)) {
+    sel.value = last;
+    syncOwnerOrg();
+  }
+}
+
+/* 选完对接人，所属中心自动带出并锁定，避免手填不一致导致归因错乱。
+   选「其他」时反过来：清空并解锁，改由用户手填姓名与中心。 */
+function syncOwnerOrg() {
+  const sel = document.getElementById('f-owner');
+  const org = document.getElementById('f-owner-org');
+  if (!sel || !org) return;
+  const opt = sel.options[sel.selectedIndex];
+  const isOther = sel.value === OWNER_OTHER;
+  const gName = document.getElementById('g-owner-custom-name');
+  const gOrg = document.getElementById('g-owner-custom-org');
+  if (gName) gName.style.display = isOther ? '' : 'none';
+  if (gOrg) gOrg.style.display = isOther ? '' : 'none';
+  org.readOnly = isOther;
+  if (isOther) {
+    org.value = '';
+    org.placeholder = '选择「其他」后请手动填写（见下方）';
+  } else {
+    org.value = (opt && opt.dataset.org) ? opt.dataset.org : '';
+    org.placeholder = '选择对接人后自动带出';
+  }
+  if (sel.value) { try { localStorage.setItem('last_owner', sel.value); } catch (e) {} }
+}
+
+/* 提交时统一取出后线对接人：名单内取选中的，选「其他」取手填的两个框。
+   返回带 error 表示必填未满足，由调用方给出提示。 */
+function readOwner() {
+  const sel = document.getElementById('f-owner');
+  if (!sel || !sel.value) return { error: '请选择后线对接人' };
+  if (sel.value === OWNER_OTHER) {
+    const name = (document.getElementById('f-owner-custom').value || '').trim();
+    const org = (document.getElementById('f-owner-custom-org').value || '').trim();
+    if (!name) return { error: '请填写对接人姓名' };
+    if (!org) return { error: '请填写对接人所属中心' };
+    return { name, org };
+  }
+  return { name: sel.value.trim(), org: (document.getElementById('f-owner-org').value || '').trim() };
+}
+
+/* 页眉副标题：城市已从表单移除，这里按「有值才拼」生成，避免出现「· UM」这类孤立分隔符 */
+function buildHeaderMeta(iv) {
+  const parts = [];
+  if (iv && iv.city) parts.push(iv.city);
+  if (iv && iv.um) parts.push('UM ' + iv.um);
+  if (iv && iv.topic) parts.push('访谈主题：' + iv.topic);
+  return parts.join(' · ') || '—';
+}
+
+const API_ENDPOINT = PROXY_URL || 'https://api.deepseek.com/chat/completions';
+
+/* ★★ 接口地址拼接（2026-09-29 起强制走这里，不要手写字符串拼接）
+   背景：这个常量以前叫 API_BASE，名字听着像"已经含 /api 的基址"，
+   实际值却是【域名根】（不含 /api）。语音功能因此写成 `API_BASE + '/asr'`，
+   请求打到未注册路径 → 网关 404 且响应不带 CORS 头 → 浏览器报
+   `TypeError: Failed to fetch`，排查了整整十轮才定位。
+   现在改名 API_ORIGIN（语义=域名根），并用 apiUrl() 收口路径拼接：
+   调用方只传 '/asr'，前缀由函数统一补，漏 /api 在结构上就写不出来了。 */
+const API_ORIGIN = PROXY_URL ? PROXY_URL.replace(/\/api\/chat\/?$/, '') : '';
+
+/* 把 '/asr' 拼成 'https://xxx/api/asr'。
+   传 '/api/asr' 也不会重复补前缀（容错，防旧写法迁移时写重）。 */
+function apiUrl(path) {
+  if (!API_ORIGIN) return '';
+  const p = String(path || '');
+  const withApi = /^\/api(\/|$)/.test(p) ? p : '/api' + (p.charAt(0) === '/' ? p : '/' + p);
+  return API_ORIGIN + withApi;
+}
+
+const SUBMIT_URL = apiUrl('/submit');
+
+/* ─── 海报图：提交前在浏览器里栅格化 ─────────────────────────
+   邮件要带的那张横版一图流，服务端渲染不了（云函数内存上限 256MB，
+   跑不动无头浏览器）。所以放在浏览器里画：外网取服务端排好的海报
+   markup，再用 SVG foreignObject 画进 canvas 导出 PNG。
+   海报不含任何外部图片/字体，全是 CSS 文本，可以安全地画进 canvas。
+   这一步失败不影响归档——降级成不带图的邮件，正文版式照旧。 */
+function posterPreviewUrl() {
+  return apiUrl('/poster');
+}
+
+function rasterizePoster(html, css, w, h) {
+  // 去掉 XML 不允许的控制字符，保证 SVG 解析不炸
+  const clean = String(html).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+    '<foreignObject width="100%" height="100%">' +
+    '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + w + 'px;height:' + h + 'px;overflow:hidden;background:#fff">' +
+    '<style>' + css + '</style>' + clean +
+    '</div></foreignObject></svg>';
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => reject(new Error('海报栅格化失败'));
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+/**
+ * 量出一段 markup 在指定宽度下的真实高度。
+ *
+ * 为什么需要：一图流是 16:9 固定画布，服务端直接给得出 h；
+ * 完整报告长图的高度由内容决定，服务端估高会随字号/换行漂移，
+ * 估短了就裁掉最后一段。所以让浏览器把 markup 先插进离屏容器
+ * 实测一遍，再拿这个高度去拼 SVG。
+ *
+ * 安全要求：长图模板的 CSS 全部挂在 .rpt-page 作用域下（见 poster.js），
+ * 所以这段 markup 可以安全地短暂插入当前页面；量完立即移除。
+ */
+function measureMarkupHeight(html, css, w) {
+  return new Promise((resolve) => {
+    const holder = document.createElement('div');
+    holder.style.cssText =
+      'position:fixed;left:-10000px;top:0;width:' + w + 'px;visibility:hidden;';
+    const styleEl = document.createElement('style');
+    styleEl.textContent = String(css || '');
+    holder.innerHTML = String(html).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    document.body.appendChild(styleEl);
+    document.body.appendChild(holder);
+
+    requestAnimationFrame(() => {
+      try {
+        const rect = holder.getBoundingClientRect();
+        const h = Math.ceil(Math.max(rect.height, holder.scrollHeight)) + 2;
+        resolve(h);
+      } catch (e) {
+        resolve(0);
+      } finally {
+        holder.remove();
+        styleEl.remove();
+      }
+    });
+  });
+}
+
+/* 长图高度兜底上限：超出说明数据异常，宁可不出图也不把浏览器画崩 */
+const MAX_FULL_PNG_H = 9000;
+
+async function rasterizeAuto(html, css, w, hHint) {
+  let h = hHint;
+  if (!h) {
+    h = await measureMarkupHeight(html, css, w);
+    if (!h) throw new Error('无法量出长图高度');
+    if (h > MAX_FULL_PNG_H) h = MAX_FULL_PNG_H;
+  }
+  return rasterizePoster(html, css, w, h);
+}
+
+/* 取服务端排好的海报 markup 并栅格化。
+   任何一步失败都 resolve(null)，让调用方降级为无图提交。 */
+/**
+ * 出一张或两张图。
+ *   kind 省略        → 简略一图流（服务端按数据自动选版式）
+ *   kind = 'full'    → 完整报告长图（高度由浏览器量出来）
+ *
+ * 任何失败都返回 null：出不了图不该阻塞归档，服务端会降级为纯 HTML 邮件。
+ */
+async function buildPosterPng(kind) {
+  try {
+    if (!posterPreviewUrl()) return null;
+    const res = await fetch(posterPreviewUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report_md: state.reportRaw, meta: state.interviewee, kind: kind || '' }),
+    });
+    const d = await res.json().catch(() => null);
+    /* 报告缺「海报摘要」时服务端明确回 ok:false，不静默换版式。
+       一图流没法出，但这不该阻塞归档——长图与正文都还在。 */
+    if (d && d.ok === false) {
+      state.posterBlocked = d.error || 'poster_unavailable';
+      return null;
+    }
+    if (!res.ok || !d || !d.html) return null;
+    state.posterBlocked = '';
+    return await rasterizeAuto(d.html, d.css, d.w, d.h);
+  } catch (e) {
+    return null;
+  }
+}
+
+function getApiHeaders() {
+  if (PROXY_URL) return { 'Content-Type': 'application/json' };
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + (BUILT_IN_API_KEY || state.apiKey),
+  };
+}
+
+// ─── state ───────────────────────────────────────────────
+let state = {
+  apiKey: '',
+  interviewee: {
+    name: '', position: '', topic: '',
+    city: '', um: '', owner: '', ownerOrg: '',
+  },
+  messages: [],   // {role, content}
+  roundCount: 0,
+  streaming: false,
+  reportRaw: '',  // 报告原文
+  archived: false,
+  posterBlocked: '',  // 非空表示一图流出图被服务端明确拒绝（如缺「海报摘要」）
+};
+
+/* ─── 访谈过程的本地持久化 ─────────────────────────────────
+   访谈动辄 15 轮以上、耗时几十分钟，期间刷新页面 / 手机息屏被回收 /
+   误关标签页都会丢失全部内容。这里把访谈过程实时写入 localStorage，
+   重新打开时提示续接。
+   注意：正在流式输出的那条 AI 回复不落盘（半截内容无意义），
+   所以保存时机是「一轮问答完成之后」。
+   ──────────────────────────────────────────────────────── */
+const DRAFT_KEY = 'iv_draft_v1';
+
+/* ─── 上下文裁剪 ───────────────────────────────────────────
+   访谈越长，上下文越不能"砍尾巴"。按条数 slice(0,N) 是错的：
+   它保留最早的、丢掉最近的，模型看不到用户刚说的话，
+   就会原地打转、重复提问，长访谈的报告也会漏掉最后几轮细节。
+
+   正确口径：永远保留 system 提示词 + 最近的消息，按「字符预算」
+   从最新往回装，装不下就丢最老的。这样单条超长回答也不会挤爆窗口。 */
+const CTX_MAX_CHARS = 24000;   // 送给模型的对话正文预算（不含 system）
+const CTX_MAX_CHARS_REPORT = 48000;  // 生成报告时放宽：报告要吃更多细节
+
+function buildContext(messages, budget) {
+  const cap = budget || CTX_MAX_CHARS;
+  const all = messages || [];
+  const sys = all.filter(function (m) { return m.role === 'system'; });
+  const rest = all.filter(function (m) { return m.role !== 'system'; });
+
+  const kept = [];
+  let used = 0;
+  // 从最新往回装，保证最近几轮一定在
+  for (let i = rest.length - 1; i >= 0; i--) {
+    const c = String(rest[i].content || '');
+    if (used + c.length > cap && kept.length) break;
+    kept.unshift(rest[i]);
+    used += c.length;
+  }
+  return sys.concat(kept);
+}
+
+/* 统一的「有效轮次」口径：只统计被访谈人真实说的话。
+   system 是提示词、internal 是系统代发的控制指令（如开场白），都不算轮次。
+   所有显示与统计（轮次徽标、续接提示、归档 round_count）都必须走这里，
+   避免同一份访谈在不同地方数出不同轮数。 */
+function countRounds(messages) {
+  return (messages || []).filter(m => m.role === 'user' && !m.internal).length;
+}
+function hasUserTurn(messages) {
+  return countRounds(messages) > 0;
+}
+
+function saveDraft() {
+  // 访谈尚未开始、或尚无有效问答时不落盘
+  if (!state.interviewee.name) return;
+  if (!hasUserTurn(state.messages)) return;
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      v: 1,
+      savedAt: Date.now(),
+      interviewee: state.interviewee,
+      messages: state.messages,
+      roundCount: state.roundCount,
+      reportRaw: state.reportRaw,
+      archived: state.archived,
+    }));
+  } catch (e) { /* 隐私模式或配额满：静默放弃，不影响访谈本身 */ }
+}
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || d.v !== 1 || !d.interviewee || !Array.isArray(d.messages)) return null;
+    if (!hasUserTurn(d.messages)) return null;
+    return d;
+  } catch (e) { return null; }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+}
+
+function fmtAgo(ts) {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return '刚刚';
+  if (m < 60) return m + ' 分钟前';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' 小时前';
+  return Math.floor(h / 24) + ' 天前';
+}
+
+/* 把已保存的 messages 逐条渲染回聊天区（含 system 之外的全部对话） */
+function renderHistory() {
+  const wrap = document.getElementById('messages');
+  wrap.innerHTML = '';
+  state.messages.forEach(m => {
+    if (m.role === 'system') return;
+    if (m.internal) return;   // 系统代发的控制指令，不进回放
+    appendMsg(m.role === 'user' ? 'user' : 'ai', m.content);
+  });
+}
+
+/* ─── 访谈素材信息量评估 ───────────────────────────────────
+   报告的质量上限由访谈素材决定：客户只说 56 个字，AI 不可能凭空
+   产出真正落地的经验，只会用通用说法把篇幅撑起来（实测出现过
+   报告字数 / 客户字数 = 14 倍的案例，通篇没有一句可照做的内容）。
+   所以在生成报告之前先量一下素材够不够，不够就建议继续访。
+   阈值是用已归档的真实报告倒推校准的，见 tests/verify-gate.js。
+   ──────────────────────────────────────────────────────── */
+const GATE = {
+  minRounds: 8,        // 有效轮次（被访谈人真实发言数）——只作为「差得远」的最低线
+  minTotalChars: 400,  // 被访谈人累计输出字数
+  minLongAnswers: 2,   // 60 字以上的长回答条数
+  longAnswerChars: 60,
+  /* ── 刻意不设轮次上限 ──
+     阅历越丰富的专家，能讲的做法越多。之前设 softMaxRounds:18 会让 AI
+     在 18 轮后就开始催收尾，实测把 19 轮的好案例（六维度齐备）也一起催停了。
+     现在改成"问到东西才收"：是否该结束由 assessCoverage() 的覆盖度决定，
+     轮数只用于提示，不用于叫停。 */
+  softWarnRounds: 25,  // 纯提示用：超过这个轮数且覆盖度仍不足 → 提醒"可能跑偏了"
+};
+
+/* ── 内容覆盖度：判断"这一访谈有没有获得有价值的信息" ──
+   这是萃取工作的核心判据：一次访谈的价值不在于聊了多少轮，
+   而在于六个内容维度是否都问到了、以及做法是否落到了方法层。
+   与轮数解耦——短而准的访谈优于长而空的访谈。 */
+const COVERAGE_DIMS = [
+  { k: 'background', label: '案例背景', probe: '客户是什么情况、怎么接触上的' },
+  { k: 'action',     label: '具体做法', probe: '一步步怎么做的、关键动作' },
+  { k: 'method',     label: '方法层细节', probe: '频次、话术、载体、对方不理会时怎么办' },
+  { k: 'result',     label: '结果与数据', probe: '带来什么结果、有没有数字' },
+  { k: 'decision',   label: '判断与取舍', probe: '当时怎么判断的、为什么这么选' },
+  { k: 'pitfall',    label: '新人易踩的坑', probe: '新人做这件事容易错在哪' },
+];
+
+/* 报告里各维度对应的节标题（模型不一定严格用同一套标题，所以给别名） */
+const COVERAGE_SECTION_ALIAS = {
+  background: ['背景与挑战', '背景'],
+  action: ['核心做法', '主要做法', '关键做法', '做法'],
+  result: ['结果', '成果', '效果', '结果与效果'],
+  decision: ['关键判断与取舍', '关键判断', '判断与取舍', '关键决策'],
+  pitfall: ['新人容易踩的坑', '新人注意事项', '新人避坑', '避坑提示'],
+};
+
+/* 方法层信号：出现这些才算"问到了具体怎么做" */
+const METHOD_SIGNAL_RE = /(每周|每月|每天|每隔|一次|第\s*\d+\s*天|多久|频次|时机|微信|电话|当面|拉群|朋友圈|名单|系统|原话|开场|说"|说「|对方没反应|不回|拒绝|拖延|怎么办)/;
+
+function sectionMap(raw) {
+  /* 把 report_md 解析成 {节标题: 正文}。
+     注意节标题可能带序号/井号/粗体，统一剥掉再比对。 */
+  const out = {};
+  String(raw || '').split(/\s*---SECTION---\s*/).forEach(part => {
+    const lines = String(part).split('\n');
+    if (!lines.length) return;
+    const title = lines[0]
+      .replace(/^\s*(?:\d+[.、）)]\s*|#{1,6}\s*)/, '')
+      .replace(/[*_【】]/g, '')
+      .replace(/[:：]\s*$/, '')
+      .trim();
+    out[title] = lines.slice(1).join('\n').trim();
+  });
+  return out;
+}
+
+/* 文本是否含"实质内容"——空话/占位不算 */
+function isSubstantive(text) {
+  const t = String(text || '').replace(/[\s*#\-]/g, '');
+  if (t.length < 12) return false;
+  if (/^(访谈中未展开|暂无|无|不适用|未提供)/.test(t)) return false;
+  return true;
+}
+
+/**
+ * 评估「这次访谈是否获得了有价值的信息」。
+ * 返回 { dims:[{k,label,ok,note}], covered, methodCovered, valuable, reasons }
+ *
+ * 判定规则（内容优先，字数只作兜底）：
+ *   valuable = 背景+做法+结果 三个必备维度有实质内容
+ *              且 做法里至少 1 处落到方法层
+ */
+function assessCoverage(raw, messages) {
+  const secs = sectionMap(raw);
+  const userText = (messages || [])
+    .filter(m => m.role === 'user' && !m.internal)
+    .map(m => String(m.content || '')).join('\n');
+
+  /* 方法层可以在报告正文出现，也可能只在对话里出现（模型没写进报告） */
+  const methodInReport = Object.keys(secs)
+    .some(t => METHOD_SIGNAL_RE.test(secs[t] || ''));
+  const methodInTalk = METHOD_SIGNAL_RE.test(userText);
+
+  const dims = COVERAGE_DIMS.map(d => {
+    let ok = false;
+    let note = '';
+    if (d.k === 'method') {
+      ok = methodInReport && methodInTalk;
+      note = ok ? '频次/话术/载体等细节有据可查'
+        : (methodInReport ? '报告里有方法层表述，但对话中未见支撑'
+          : (methodInTalk ? '对话里提到过，但没写进报告' : '还没问到具体怎么做'));
+    } else {
+      const aliases = COVERAGE_SECTION_ALIAS[d.k] || [];
+      /* 节标题匹配分两级：先精确命中别名，再退到「标题包含别名」——
+         模型不一定照模板写标题，实测出现过「结果与数据」「背景与挑战」
+         这类扩展写法，精确匹配会漏。 */
+      const hitKey = aliases.find(a => secs[a] != null)
+        || Object.keys(secs).find(t => aliases.some(a => t.indexOf(a) >= 0));
+      const hit = hitKey != null ? secs[hitKey] : null;
+      ok = isSubstantive(hit);
+      /* 「结果与数据」要区分有无数字：定性描述也算覆盖，但没数字时
+         萃取价值打折扣，note 里点出来（不做硬门槛，免得误伤真没数字的案例）。 */
+      if (d.k === 'result' && ok && !/[0-9０-９]/.test(String(hit))) {
+        note = '有内容但没数字，说服力偏弱';
+      } else {
+        note = ok ? '有实质内容' : '这一块还是空的';
+      }
+    }
+    return { k: d.k, label: d.label, probe: d.probe, ok, note };
+  });
+
+  const byKey = {};
+  dims.forEach(d => { byKey[d.k] = d; });
+  const covered = dims.filter(d => d.ok).length;
+
+  /* 必备三维：没背景讲不清场景，没做法等于没经验，没结果无法判断值不值得学 */
+  const required = ['background', 'action', 'result'];
+  const missingRequired = required.filter(k => !byKey[k].ok);
+
+  const reasons = [];
+  if (missingRequired.length) {
+    reasons.push('还缺：' + missingRequired.map(k => byKey[k].label).join('、'));
+  }
+  if (byKey.method.ok === false) reasons.push('做法还没落到方法层（频次/话术/载体/应对）');
+
+  const valuable = missingRequired.length === 0 && byKey.method.ok;
+
+  return { dims, covered, total: dims.length, methodCovered: byKey.method.ok, valuable, reasons };
+}
+
+function assessInterview(messages) {
+  const userMsgs = (messages || [])
+    .filter(m => m.role === 'user' && !m.internal)
+    .map(m => String(m.content || ''));
+
+  const rounds = userMsgs.length;
+  const totalChars = userMsgs.reduce((s, t) => s + t.length, 0);
+  const longAnswers = userMsgs.filter(t => t.length >= GATE.longAnswerChars).length;
+
+  const gaps = [];
+  if (rounds < GATE.minRounds) gaps.push('有效轮次还差 ' + (GATE.minRounds - rounds) + ' 轮');
+  if (totalChars < GATE.minTotalChars) gaps.push('你的回答累计才 ' + totalChars + ' 字，建议说到 ' + GATE.minTotalChars + ' 字以上');
+  if (longAnswers < GATE.minLongAnswers) gaps.push('说得很细的回答还差 ' + (GATE.minLongAnswers - longAnswers) + ' 条');
+
+  return {
+    rounds, totalChars, longAnswers, gaps,
+    ok: gaps.length === 0,
+  };
+}
+
+/* 报告里还有哪些坑：
+   ① 客户字数太少 → 报告多半是 AI 自己编的通用话
+   ② 最后一条 AI 提问没有对应的回答 → 访谈被截断，报告会缺一块 */
+function collectReportIssues(messages, raw) {
+  const issues = [];
+  const a = assessInterview(messages);
+
+  if (a.totalChars < GATE.minTotalChars) {
+    issues.push({
+      level: 'warn',
+      text: '这次访谈的素材偏薄：你的回答累计 ' + a.totalChars + ' 字，'
+          + '报告里一部分内容可能是泛泛的经验之谈，而不是你说过的做法。'
+          + '建议返回访谈再补几轮细节，尤其是「具体怎么做」的部分。',
+    });
+  }
+
+  const msgs = (messages || []).filter(m => !m.internal && m.role !== 'system');
+  const last = msgs[msgs.length - 1];
+  if (last && last.role === 'assistant') {
+    issues.push({
+      level: 'info',
+      text: '最后一个提问没有对应的回答，这次访谈看起来是提前结束的，'
+          + '报告里相关部分会缺一块。可以返回访谈补上这一问，再重新生成报告。',
+    });
+  }
+
+  // 膨胀比：报告字数 ÷ 客户字数。3-5 倍以内说明报告基本是「整理」出来的；
+  // 超过 8 倍通常意味着 AI 补了大量模板话，值得人工过一眼。
+  const userChars = (messages || [])
+    .filter(m => m.role === 'user' && !m.internal)
+    .reduce((s, m) => s + String(m.content || '').length, 0);
+  if (userChars > 0) {
+    const ratio = Math.round(String(raw || '').length / userChars);
+    if (ratio >= 8) {
+      issues.push({
+        level: 'warn',
+        text: '报告字数是你回答字数的约 ' + ratio + ' 倍，比例偏高，'
+            + '说明报告里可能有不少不是你原话的内容。归档前建议通读一遍，把不像你说的话删掉。',
+      });
+    }
+  }
+
+  return issues;
+}
+
+function renderAlert(list) {
+  const box = document.getElementById('report-alerts');
+  if (!box) return;
+  const arr = list || [];
+  box.innerHTML = arr.map(x =>
+    '<div class="report-alert ' + (x.level === 'warn' ? 'warn' : 'info') + '">'
+    + '<span class="ico">' + (x.level === 'warn' ? '!' : 'i') + '</span>'
+    + '<span class="txt">' + escHtml(x.text) + '</span></div>'
+  ).join('');
+}
+
+/* 覆盖度体检条：把「六个维度问到没有」直接摊在报告页上。
+   这是"AI 判断这次访谈有没拿到有价值信息"的可见形态——
+   一线看到缺哪块，返回访谈时就对着补那一块，不用猜。 */
+function renderCoverage(coverage) {
+  const box = document.getElementById('report-coverage');
+  if (!box) return;
+  if (!coverage || !coverage.dims || !coverage.dims.length) { box.innerHTML = ''; return; }
+
+  const chips = coverage.dims.map(d =>
+    '<div class="cov-chip ' + (d.ok ? 'ok' : 'gap') + '" title="' + escHtml(d.probe) + '">'
+    + '<span class="cov-mark">' + (d.ok ? '✓' : '○') + '</span>'
+    + '<span class="cov-label">' + escHtml(d.label) + '</span>'
+    + '<span class="cov-note">' + escHtml(d.note) + '</span></div>'
+  ).join('');
+
+  const head = coverage.valuable
+    ? '<div class="cov-head ok">素材可用 · 六个维度已覆盖 ' + coverage.covered + ' / ' + coverage.total + '</div>'
+    : '<div class="cov-head gap">素材仍有缺口 · 已覆盖 ' + coverage.covered + ' / ' + coverage.total
+      + '（' + escHtml(coverage.reasons.join('；')) + '）</div>';
+
+  box.innerHTML = '<div class="cov-wrap">' + head + '<div class="cov-chips">' + chips + '</div></div>';
+}
+
+/* 报告页要显示的内容 = 覆盖度结论（主判据）+ 原有报告问题。
+   头条结论必须同时看两个信号，否则会自相矛盾：
+   结构上六维齐备（如 #8 王示例，56 字原话也凑齐了六节）但客户原话总量极少时，
+   不能说"素材够用"——报告大部分内容是模型补的通用话。 */
+function buildReportAlerts(messages, raw) {
+  const list = [];
+  const cov = assessCoverage(raw, messages);
+  const a = assessInterview(messages);
+  if (cov.valuable && a.totalChars >= GATE.minTotalChars) {
+    list.push({
+      level: 'info',
+      text: '这次访谈的素材够用：背景、做法、结果都问到了，做法也落到了具体频次／话术／载体一层。',
+    });
+  } else if (cov.valuable && a.totalChars < GATE.minTotalChars) {
+    list.push({
+      level: 'warn',
+      text: '访谈在结构上六个维度都碰到了，但你的原话累计只有 ' + a.totalChars
+          + ' 字，报告里大部分内容可能是模型补的通用说法，而不是你讲的做法。'
+          + '建议返回访谈，把「具体怎么做」用你自己的话讲出来再重新生成。',
+    });
+  } else {
+    list.push({
+      level: 'warn',
+      text: '这次访谈的素材还不齐（缺：' + cov.reasons.join('；') + '）。'
+          + '报告里缺的这几块，模型只能用通用说法撑篇幅，建议返回访谈补上再重新生成。',
+    });
+  }
+  return list.concat(collectReportIssues(messages, raw));
+}
+
+/* 主题是自由文本，这里给出六个方向并配上各自该挖的细节，
+   避免不同人写同一件事却挖出完全不同的深度。 */
+const TOPIC_FOCUS = [
+  { k: ['转介绍','介绍','推荐'], v: '这一段重点挖：他日常做了哪几件事让老客户愿意开口转介绍；开口那一刻第一句话怎么说；转介绍来的客户与陌生客户在接触方式上有什么不同。' },
+  { k: ['孤儿单','存量','老客户','盘活','不活跃'], v: '这一段重点挖：他从哪个名单/系统里取这批客户（从哪里看、怎么筛）；什么情况下先发微信、什么情况下直接打电话；微信第一句发什么、电话前三句怎么说。' },
+  { k: ['批款','放款','跟进','服务','售后'], v: '这一段重点挖：批款后哪几个节点必须联系客户（第几天、对方下一步要办什么）；额度没到客户预期时原话怎么说；有没有固定的联系节奏。' },
+  { k: ['件均','高件均','额度','大额','高额度'], v: '这一段重点挖：他从哪些特征判断客户可能有大额度需求；判断出之后按什么顺序推进、每一步做什么。' },
+  { k: ['被拒','拒件','拒绝','挽回','二次','回捞'], v: '这一段重点挖：被拒之后隔多久重新联系；重新联系时开场白怎么说；哪些拒绝原因值得再争取、哪些直接放下。' },
+  { k: ['渠道','获客','陌拜','展会','市场','商圈'], v: '这一段重点挖：他通过什么具体渠道找到客户；第一次接触的前三句怎么说；一周接触多少、在什么时间点接触。' },
+];
+
+function topicFocus(t) {
+  const s = String(t || '');
+  const hits = TOPIC_FOCUS.filter(g => g.k.some(w => s.includes(w)));
+  if (!hits.length) return '';
+  return '\n' + hits.slice(0, 2).map(g => g.v).join('\n');
+}
+
+const SYSTEM_PROMPT = (n, p, t, c, um) => `你是一名专业的案例访谈员，服务于平安融易西安分公司的销售团队。你的任务是通过结构化对话，帮助被访谈人梳理并沉淀一个真实的销售案例或工作经验，最终形成可供全员学习的经验案例。
+
+【被访谈人信息】
+姓名：${n}
+岗位：${p}
+UM 号：${um}
+所属城市：${c}
+本次访谈主题：${t}
+${topicFocus(t)}
+【角色定位】
+你是一个有亲和力、善于倾听的访谈员，不是考官，不是评分者。用鼓励性语气让对方放松，愿意分享细节。使用口语化中文，避免生硬书面体。
+
+【一轮只问一个问题 · 硬规则，最常被违反的一条】
+你的每句话里**只能有一个问号**。这不是建议，是硬性要求。
+为什么：一轮问两三个问题，对方只会挑最省力的那个答，其余全丢。反过来，
+一次只问一个，他只能正面回答这个点，信息密度反而更高。
+
+写之前先自查：把这句话数一遍问号。
+- ✗ 错（3个问号）："那除了送礼，平时会不会有别的互动？比如微信上聊聊，或者朋友圈点赞？另外这次老客户是怎么把朋友介绍给你的，直接打电话还是拉了个群？"
+- ✓ 对（1个问号）："那你平时是怎么维护这些老客户的呢，比如多久联系一次？"
+  下一轮再问："除了见面，微信上有互动吗？"
+
+如果你发现自己很想同时问好几件事，说明这些事该拆成好几轮，而不是塞进一句话。
+**宁可多聊两轮，也不要一次问三个问题。**
+
+另外：一句话的长度控制在 **60 字以内**。你问得越长，对方答得越短——
+这条和下面的短答兜底是同一件事的两面。
+
+【最重要的一件事：问到"怎么做"，不只是"做了什么"】
+这份访谈最终要变成别人能照着做的经验。所以当对方说了一个动作（维护、跟进、转介绍、沟通、打电话），你的任务不是点头接着往下问，而是继续问到方法为止。
+
+对方说"我会定期维护客户"——这不是答案，这是标题。你要接着问出来的是：
+- 多久维护一次？按周还是按月？中间隔多久没联系就不算维护了？
+- 用什么方式？微信发消息、打电话、还是当面？发的是自己写的还是转的？
+- 第一句话怎么说？能不能把他当时发的那条消息念一下？
+- 对方一般是什么反应？如果不回，他下一步做什么？
+- 这个动作做了多久才见效？有没有一个"再也没动静就放弃"的界限？
+
+上面五问里，至少要问到两问有具体答案，这个动作才算记录完整。
+
+注意：追问不是审问。每次只追一个问题，用"那具体是怎么做的呢？""能不能举个例子？""当时那句话是怎么说的？"这样的口气。对方答不上来或说不清时，不要硬追，换一个角度，或者记下"这一点他没说清"继续往下走。
+
+【访谈框架】按顺序推进，每个维度深入挖掘后再进入下一个：
+1. 破冰（1-2轮）：介绍访谈目的，让对方放松
+2. 背景了解（2-3轮）：案例发生的背景和挑战
+3. 具体行动（3-5轮）：具体做了哪些动作，关键步骤。每一步都要落到方法层
+4. 结果与数据（1-2轮）：最终效果，有无数据。**同时要问出参照系**（见下方「结果要有参照系」）
+5. 关键决策（2-3轮）：重要判断与取舍。**必须问出"当时还有别的走法吗、为什么没选"**（见下方「取舍要问出被放弃的那条路」）
+6. 可复制经验（2-3轮）：哪些情况下其他同事可以参考
+7. 新人容易踩的坑（2轮）：先问别人常踩的坑，**再单独问一轮"你自己搞砸过的"**（见下方「失败单也要问」）
+8. 收尾（1轮）：感谢对方，告知将整理成报告
+
+【结果要有参照系 · 只报一个数字等于没报】
+对方给出成绩（"做了 300 万""转介绍 5 个""放了 12 单"）时，这个数字本身说明不了任何事。
+必须再追一句参照：
+- 跟团队平均比怎么样？（"这个数在你们营业部算高的还是平的？"）
+- 跟自己的平时比怎么样？（"你平时一个月大概多少？"）
+- 跟同样条件的人比怎么样？（"别的同事也做这批客户，一般能出多少？"）
+把参照系拿到手，这个结果才有说服力。对方说不上来具体数，就让他说个大概档位
+（"算好的那一档吧"）也行，如实记录。
+
+【取舍要问出被放弃的那条路 · 访谈最容易漏的一块】
+对方说"我决定先做 A"时，这句话只讲了一半。另外一半是：**本来还可以做 B，他为什么没做**。
+问法（一次只问一个）：
+- "当时除了这个走法，还有别的选择吗？"
+- "那你为什么没选那个？"
+- "现在回头看，当时那个判断还成立吗？"
+拿到"被放弃的那条路 + 否掉它的理由"，别人才知道什么条件下该学、什么条件下不该学。
+这一步问不到，就如实记"他没提到其他走法"，不要替他编一个。
+
+【失败单也要问 · 只讲成功案例学不到东西】
+成功案例容易被讲成"我做得对"，但别人真正会踩的坑，往往在他搞砸过的那一单里。
+在第 7 步（新人容易踩的坑）之后，**单独问一轮**，句式从"别人"转到"你自己"：
+- "这一单之前，有没有类似的客户你跟进丢了、或者做砸过？"
+- "那一单错在哪一步？"
+- "后来你改了什么做法？"
+对方说"没有"，就换选择题帮他回忆："是丢在前期接触，还是丢在资料或审批环节？"
+他讲不出来的，如实记"他说没有类似的失败经历"，不要编。
+
+【追问规则】
+- 回答笼统时（"做了很多工作"）→ 追问具体动作，再用下面的"方法层五问"继续追
+- 只说动作名时（"定期维护""主动开口""多沟通"）→ 一定要追问到频次、话术、工具、应对
+- 给出成绩数字时 → **必须再追一句参照系**（"这个数在你们营业部算高的还是平的？""你平时大概多少？"），没有参照系的数字等于没报
+- 讲到顺利的地方时 → 反向追一句："那有没有哪一单你是搞砸过的？错在哪一步？"
+- 提到客户反应时 → 追问客户原话或具体表现
+- 说"运气好"时 → 追问哪些可控因素起了作用
+- 提到判断和取舍时 → 追问他是根据什么判断的、有没有看走眼的时候，**还要追问当时有没有别的走法、为什么没选**
+- 提到用了某个工具、系统、名单时 → 追问在哪个位置看、按什么条件筛
+
+【对方答得很短时，绝对不能放过（最容易丢信息的地方）】
+实际情况里，对方经常只回几个字："直接打""没有""可以""还行""就这样"。
+这种回答**不是信息**，是没答。你一旦点头接过去换下一个问题，这条经验就永久丢了。
+判断标准：一句话少于 8 个字，或只有结论没有过程，就算"没答"。
+
+遇到这种短答，你要做的是**就地补一枪**，而不是往下走：
+- 对方说"直接打" → "打之前你有没有先想好第一句说什么？当时开口是怎么说的？"
+- 对方说"没有" → 换成选择题帮他回忆："是全程都比较顺，还是有环节要反复确认的？比如资料、额度、审批？"
+- 对方说"可以" → "大概多久出结果的？当时你跟客户是怎么说的？"
+- 对方说"还行" → "那你觉得哪一步比预期顺利，哪一步比预期麻烦？"
+
+补一枪的原则：
+1. **同一个点最多补两枪**。两枪还是短答，说明他这块确实没细想，就如实记下"这一点他没说清"，
+   换个角度继续，不要死缠。
+2. 补的时候**给具体选项比问开放式问题更有效**（"是A还是B"比"具体说说"更容易开口）。
+3. 不要直接说"你答得太短了"或"请详细一点"——对方会觉得被质疑，反而更不愿说。
+   用"我想多了解一点""当时那句话是怎么说的"这种口气。
+4. 补问的话术要**短**。你上一句说得越长，对方回得越短。
+
+【结束判断】满足以下条件时主动提出结束：
+- 已完成至少 15 轮对话
+- 六个维度均有实质内容，且至少有 3 个动作已经问到方法层（有频次、有话术或有应对办法）
+- 收尾前必须问一句："还有没有什么是我没问到、但你觉得对同事有帮助的？"并等对方回答
+- 最后确认："我已经收集到了很丰富的信息，我来帮你整理成报告，你看还有什么想补充的吗？"
+
+【轮次不是目标，"问到东西"才是】
+不要为了凑够 15 轮而拖；但反过来，**没问到 15 轮之前不要主动收尾**——
+哪怕对方答得短。真实情况里，答得短的人往往不是没东西，而是要问到点子才开口。
+正确做法是先按上面的"短答兜底"补一枪、换成选择题问，而不是提前结束。
+
+只有这两种情况可以早于 15 轮收尾：
+1. 对方明确表示不想继续（"先这样吧""就到这儿"），尊重对方，立刻收尾；
+2. 六个维度确实都覆盖到了，且已经有 3 个动作落到方法层。
+
+【不要无限聊下去】
+访谈一旦超过 20 轮，边际信息量会明显下降，而且越往后越容易绕回已经问过的问题。
+出现下面任一情况，就该主动收尾（问上面那句收尾语），而不是继续挖新问题：
+- 已经聊到 20 轮以上，且六个维度都覆盖过了
+- 对方最近两三轮的回答开始重复之前说过的内容
+- 对方连续三轮都是"嗯""对""就这样"，且你已经按"短答兜底"各补过一枪仍无进展
+如果对方在你提出收尾后说"还有要补充的"，就继续聊；否则不要再自造新问题拖长访谈。
+
+【信息脱敏 · 必须严格遵守】
+本次访谈将被归档并可能用于全员分享，因此严禁记录任何可直接识别客户身份的信息，包括但不限于：
+- 客户真实姓名（须改用"某先生""某女士""某客户"等泛称）
+- 手机号、座机、微信号、车牌号
+- 身份证号、银行卡号、社保号
+- 客户名下企业全称、门店字号、具体经营地址（可写"某建材商户""某餐饮店"）
+- 客户所在的具体小区名、楼盘名、写字楼名（可写"某小区""城南一个楼盘"）
+- 客户具体的贷款金额、准确的月收入数字（可写"几十万""月流水几十万"）
+当被访谈人主动说出上述信息时，先礼貌提示："为了保护客户隐私，这里用'某客户'来指代就好，我们继续。"然后继续访谈，不要复述该信息。若对方坚持说出，记录时也不要重复，只做泛化处理。如果对方已经说出口，你在接下来的一两轮里不要再复述这些具体名字或数字。
+
+【约束】不评价对方工作好坏；不透露是AI（如被问，说"我是访谈助手"）；不提任何与本次访谈无关的话题；每次回复控制在60字以内（且只含一个问号）；不跳过任何维度。`;
+
+const REPORT_PROMPT = (n, p, t) => `请根据以上完整的访谈对话内容，生成一份结构化案例经验报告。
+
+【本书写总则 · 先看这条】
+这份报告的唯一用途是让没做过这件事的同事照着做，所以判断标准只有一条：
+读完这一节，同事能不能在明天就把动作做出来？
+凡是只有动作名、没有做法的句子（"定期维护""加强沟通""主动转介绍""做好服务"），一律不合格，必须写清具体怎么做。
+
+【三条最容易写不合格的地方 · 写完自查】
+1. **只报结果、没有参照系**：光写"做到 300 万"，读者不知道这是好还是坏。
+   凡是出现结果数字，必须同时给出参照（团队平均 / 他自己的平时水平 / 同条件同事的档次）。
+   对话里没问到参照，就写"（这个数字的参照系访谈中未提到）"，不要自己造一个。
+2. **只写选了什么、没写放弃了什么**：判断与取舍一节如果只写"他决定先做老客户"，
+   读者学不到边界。每条决策都要写清另外那条被否掉的路。
+3. **一条做法里一句原话都没有**：核心做法每一步至少要保住一句被访谈人的原话
+   （用「」标出），原话是这份报告最不可替代的部分。
+   **确实没有原话的步骤，那一行写"（访谈中未留下原话）"，不要自己造一句。**
+
+【不许编造 · 最后再看一遍】
+只写对话里出现过的内容。不要补充被访谈人没说的经验、数字、话术、工具或案例。对话中没提到的细节，就写"这一点访谈中未展开"，不要用行业通用说法把它填满。宁可少写一条，不要凑数。
+
+严格按照以下格式输出，每个部分之间用"---SECTION---"分隔：
+
+【分隔符 · 必须逐字符照抄，这是最容易写错的地方】
+节与节之间**只能**写这 13 个字符：---SECTION--- （三横线 + SECTION + 三横线）。
+- 不许写成 ---、----、***、===、—— 或空行
+- 不许写成 --- SECTION ---、--SECTION--、---section---
+- 不许给分隔符加缩进、编号或说明文字
+每写完一节就立刻敲这 13 个字符，再开始下一节。报告总共要有 6 个这样的分隔符（7 节）。
+
+背景与挑战
+（2-3句话描述案例发生的背景，面临什么问题或机会。只写对话中出现过的背景。）
+---SECTION---
+核心做法
+（这一步不要罗列人生经历，要写他实际怎么做的，用"1. 2. 3."编号分步。
+每一步必须写清：什么时间/什么条件下做、具体怎么做的（动作、频次、载体）。
+能被别人直接照搬的细节要保留，例如"每周五下午翻一遍批款名单，挑出额度到账满三天的客户"。
+**每一步的末尾必须带一行原话**，格式为「原话：『……』（谁说的）」，
+把被访谈人当时说的那句话原样抄进来，不要转述、不要润色。
+例： 原话：『哥，款到了记得查一下，有问题随时找我』（王XX）
+如果这一步访谈里确实没留下原话，就写"原话：（访谈中未留下原话）"，不要自己造一句。
+如果某一步的细节访谈里没有，直接写"（访谈中未展开）"，不要凭空补。）
+---SECTION---
+关键判断与取舍
+（对话里出现过的决策点各写一条，用"1. 2. 3."编号。
+**每条必须写成三段式，缺一段这条就不合格**：
+
+* 可选走法：当时面前摆着几条路（至少列 2 条，用 A/B 标出，一句话一条）
+* 选择依据：他根据什么选的，要落到可观察的信号（客户说了什么、做了什么，
+  哪个名单/哪条数据），不要写成"凭经验感觉"
+* 被否掉的那条路为什么不行：他放弃的那条路是哪个、为什么放弃
+
+如果对方确实没提到其他走法，第三段写"（他没提到其他走法）"，不要替他编一个。
+如果有他看走眼或后来调整过的例子，一并写出来。
+
+写法示例（注意对比）：
+× 不合格：1. 他判断老客户更值得跟进，就先做了老客户。
+√ 合格：1. 先做老客户还是先扫新名单
+   - 可选走法：A 先把手上 40 个到期老客户回访一遍；B 先跟着营业部的陌拜名单扫新客户
+   - 选择依据：他翻了批款名单，发现老客户里有 12 个额度到账满三个月还没动过，
+     而且其中 8 个是他自己经手的，「我问过的那几个，都知道我姓什么」
+   - 被否掉的那条路为什么不行：陌拜名单他试过两周，「一天扫十条，能搭上话的就一两个」，
+     转化太慢，撑不起当月的件数要求）
+---SECTION---
+结果
+（量化结果优先；没有数字就写对方的描述性反馈。如果连描述性反馈也没有，写"访谈中未提供结果信息"。
+**只要出现了结果数字，这一节的最后必须单独加一行"团队参照："**，
+写清这个数字相对团队平均 / 他自己平时 / 同条件同事处于什么水平。
+例：团队参照：同期营业部人均约 5 单，他做了 12 单，属于靠前的那一档
+访谈里没问到参照，就写"团队参照：（访谈中未提到，建议补充访谈）"，不要自己编一个。）
+---SECTION---
+可复制的经验点
+（写 2-4 条。每一条必须严格按下面四层结构写，四层都要有内容：
+
+* 做法：一句话，讲清"在什么情况下可以做什么"，不超过40字。
+  具体怎么做：
+  - 频次/时机：（多久一次、什么时候做。没有明确频次就写"没有固定频次，视情况"）
+  - 话术/方法：（他原话怎么说的，或者具体操作步骤。尽量引用他的原话，用引号标出）
+  - 载体/工具：（微信、电话、当面、哪个名单、哪张表）
+  - 对方没反应时怎么办：（客户不回、拒绝、拖延时的应对）
+  - 触发信号：（出现什么信号就该启动这个动作。要写成可观察的现象，
+    例如"客户说'我再考虑一下'超过两次""批款到账第3天没动静"。
+    不要写成"客户有需求的时候"这种没法判断的话。没提到就写"（未提到触发信号）"）
+  - 失效边界：（什么情况下这个做法不管用 / 会适得其反。例如"这个做法只在客户已经
+    见过一次面的前提下有效，纯陌拜打过去会被当成骚扰"。没提到就写"（未提到失效边界）"）
+
+写法示例（注意对比）：
+× 不合格：在客户成交后，可以定期维护，长期积累信任。
+√ 合格：做法：客户成交后，可以按时间节奏做关系维护。
+  具体怎么做：
+  - 频次/时机：放款后第3天必发一条到账提醒，之后每月月初发一次
+  - 话术/方法：第3天发"哥，款到了记得查一下，有问题随时找我"；每月月初发跟业务无关的问候，不催不推
+  - 载体/工具：微信私聊，不群发、不加表情包
+  - 对方没反应时怎么办：两次不回就停1-2个月，节日再发一次，别连着追
+  - 触发信号：批款到账后第3天还没收到客户的回执消息
+  - 失效边界：只在已经见过面、加过微信的客户身上有效；纯电话名单上直接发会被当营销短信
+
+每条一行开头必须是"做法："，紧跟"具体怎么做："，不要合并成一段。）
+---SECTION---
+新人容易踩的坑
+（写 2-3 条容易踩坑的地方，必须是"做的事"而不是"要有的品质"。
+每条格式："在……的时候，容易……，会导致……。可以改成……。"
+必须落到具体动作，例如"第一次打电话就推产品，客户一句'暂时不用'就挂断，后面很难再联系上。可以改成先问对方最近资金周转情况，再谈产品。"
+"要保持耐心""要用心服务"这类只讲态度不讲动作的话，不要写。）
+---SECTION---
+海报摘要
+（这一节是给"一图流"海报用的，会被排成一张横版图发到群里。要求极简、可读、能扫一眼看懂。
+必须严格按下面的键值格式写，每个键另起一行，不要写多余的解释：
+
+钩子句：<一句话点出这件事的反差或亮点，20 字以内，要带数字。例如"额度不大的老客户，也能转介绍出100万"；把数字单独用【】括起来>
+成果1：<数字>|<说明，12 字以内>
+成果2：<数字>|<说明，12 字以内>
+成果3：<数字或关键词>|<说明，12 字以内>
+做法1标题：<4-6 字>
+做法1做法：<一句话讲清在什么条件下做什么，30 字以内>
+做法1示例：<他原话怎么说的，或具体到能照搬的细节，30 字以内。尽量用原话>
+做法2标题：……
+（按上面的四行一组，把核心做法逐条写完，条数与"核心做法"一节一致，最多 8 条）
+判断句：<把"关键判断与取舍"里最重要的那条压成一句话，45 字以内。要带上被否掉的那条路，例："先啃老客户、不扫新名单——陌拜一天十条搭上话不到两个">
+避坑句：<把"新人容易踩的坑"里最要紧的那条压成一句话，45 字以内>
+
+写这一节的硬要求：
+1. 每一条都必须能在上面的正文里找到对应，不许为了排版好看而新造内容。
+2. 数字必须与正文一致，没有数字就写"暂无"，不要编一个。
+3. 字数超了宁可删词，不要写成半句话。
+4. 只输出上面这些键值行，不要加标题层级、不要加序号、不要加 markdown 符号。）
+
+访谈对象：${n}（${p}）
+案例主题：${t}
+
+【脱敏要求】报告正文中不得出现客户真实姓名、手机号、身份证号、银行卡号、客户企业全称等任何可直接识别客户身份的信息。如需指代客户，统一使用"某先生""某女士""某客户""某商户"等泛称。此要求优先级高于内容完整性。
+
+请仅输出报告内容，不要有前言或后记。`;
+
+const SECTION_TITLES = ['背景与挑战','核心做法','关键判断与取舍','结果','可复制的经验点','新人容易踩的坑','海报摘要'];
+
+/* 海报摘要节的标题（内部数据，不在报告页展示；复制全文时也跳过） */
+const POSTER_SECTION_TITLE = '海报摘要';
+
+// ─── setup ───────────────────────────────────────────────
+window.onload = () => {
+  // 页面版本号（同事看不到新功能时，让他读这一行即可判断版本）
+  const stampEl = document.getElementById('build-stamp');
+  if (stampEl) stampEl.textContent = '程序版本 ' + APP_BUILD;
+  console.log('[访谈工具] 程序版本 ' + APP_BUILD);
+
+  // 配置了代理或内置 Key 时，隐藏 Key 输入区域
+  if (PROXY_URL || BUILT_IN_API_KEY) {
+    const sec = document.getElementById('apikey-section');
+    if (sec) sec.style.display = 'none';
+  } else {
+    const saved = localStorage.getItem('ds_key');
+    if (saved) document.getElementById('f-apikey').value = saved;
+    document.getElementById('toggle-key').onclick = () => {
+      const inp = document.getElementById('f-apikey');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    };
+  }
+  // 后线对接人下拉：填选项 + 选择后自动带出所属中心
+  fillOwnerOptions();
+  const ownerSel = document.getElementById('f-owner');
+  if (ownerSel) ownerSel.addEventListener('change', syncOwnerOrg);
+
+  // 语音输入：浏览器支持才显示麦克风按钮
+  initMic();
+
+  offerDraftResume();
+};
+
+/* ─── 打开页面时提示续接未完成的访谈 ─── */
+function offerDraftResume() {
+  const d = loadDraft();
+  if (!d) return;
+  const bar = document.getElementById('draft-bar');
+  if (!bar) return;
+  const rounds = countRounds(d.messages);
+  document.getElementById('draft-info').textContent =
+    d.interviewee.name + '（' + d.interviewee.position + '） · 已完成 ' + rounds +
+    ' 轮 · 保存于 ' + fmtAgo(d.savedAt);
+  bar.style.display = 'flex';
+}
+
+function resumeDraft() {
+  const d = loadDraft();
+  if (!d) { location.reload(); return; }
+
+  state.interviewee = d.interviewee;
+  state.messages = d.messages;
+  state.roundCount = d.roundCount || 0;
+  state.reportRaw = d.reportRaw || '';
+  state.archived = !!d.archived;
+
+  const iv = state.interviewee;
+  document.getElementById('header-name').textContent = iv.name + ' · ' + iv.position;
+  document.getElementById('header-meta').textContent = buildHeaderMeta(iv);
+
+  renderHistory();
+  updateRoundBadge();
+  document.getElementById('draft-bar').style.display = 'none';
+
+  // 已生成过报告：直接回到报告页，避免重复生成
+  if (state.reportRaw) {
+    showScreen('report-screen');
+    renderReportMeta();
+    renderReport(state.reportRaw);
+    renderAlert(buildReportAlerts(state.messages, state.reportRaw));
+    renderCoverage(assessCoverage(state.reportRaw, state.messages));
+    resetArchiveUI();
+    if (state.archived) {
+      const btn = document.getElementById('archive-btn');
+      btn.disabled = true;
+      btn.classList.add('done');
+      btn.textContent = '已归档 ✓';
+      const st = document.getElementById('archive-status');
+      st.textContent = '本条已提交过归档';
+      st.className = 'archive-status ok';
+    }
+    return;
+  }
+
+  showScreen('chat-screen');
+}
+
+function discardDraft() {
+  if (!confirm('放弃这条未完成的访谈记录？放弃后无法恢复。')) return;
+  clearDraft();
+  document.getElementById('draft-bar').style.display = 'none';
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function showError(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+function clearError() { document.getElementById('setup-error').style.display = 'none'; }
+
+/* 主题快选：点一下把方向填进输入框，用户再按自己的说法改。
+   全是自由填写的话，不同人对同一件事会写出差别很大的主题，
+   访谈的挖掘方向也就跟着漂。 */
+function pickTopic(btn) {
+  const ta = document.getElementById('f-topic');
+  if (!ta) return;
+  const cur = ta.value.trim();
+  const label = btn.textContent.trim();
+  // 已经写过的内容保留，把选中的方向拼在后面
+  ta.value = cur ? (cur.includes(label) ? cur : cur + ' · ' + label) : label;
+  ta.focus();
+  autoResize(ta);
+}
+
+async function startInterview() {
+  clearError();
+  const name = document.getElementById('f-name').value.trim();
+  // 岗位与城市已从表单去掉：被访谈人固定为咨询顾问（填表人都是顾问本人），
+  // 城市不再作为归档必填项（报告与海报本来也不出现具体地名）。
+  const position = '咨询顾问';
+  const city = '';
+  const um = document.getElementById('f-um').value.trim();
+  const topic = document.getElementById('f-topic').value.trim();
+  const ownerRes = readOwner();
+  if (ownerRes.error) return showError(ownerRes.error);
+  const owner = ownerRes.name;
+  const ownerOrg = ownerRes.org;
+
+  if (!name) return showError('请填写被访谈人姓名');
+  if (!um) return showError('请填写被访谈人 UM 号');
+  if (!topic) return showError('请填写访谈主题');
+
+  // 草稿保护：本地若存有一条尚未归档的访谈，开始新访谈会把它覆盖掉，先确认
+  const pending = loadDraft();
+  if (pending && !pending.archived) {
+    const r = countRounds(pending.messages);
+    const ok = confirm(
+      '检测到一条未完成的访谈记录：\n\n' +
+      pending.interviewee.name + '（' + pending.interviewee.position + '）\n' +
+      '已完成 ' + r + ' 轮，保存于 ' + fmtAgo(pending.savedAt) + '\n\n' +
+      '继续操作将覆盖这条记录，且无法恢复。\n确认开始新访谈吗？'
+    );
+    if (!ok) return;
+  }
+
+  // 仅在无代理且无内置 Key 时才要求用户输入
+  let apiKey = BUILT_IN_API_KEY;
+  if (!PROXY_URL && !apiKey) {
+    apiKey = document.getElementById('f-apikey').value.trim();
+    if (!apiKey) return showError('请填写 DeepSeek API Key');
+    if (!apiKey.startsWith('sk-')) return showError('API Key 格式不正确，应以 sk- 开头');
+    localStorage.setItem('ds_key', apiKey);
+  }
+
+  state.apiKey = apiKey;
+  state.interviewee = { name, position, topic, city, um, owner, ownerOrg };
+  state.messages = [];
+  state.roundCount = 0;
+  state.reportRaw = '';
+  state.archived = false;
+
+  document.getElementById('header-name').textContent = name + ' · ' + position;
+  document.getElementById('header-meta').textContent = buildHeaderMeta({ city, um, topic });
+  document.getElementById('messages').innerHTML = '';
+  updateRoundBadge();
+
+  showScreen('chat-screen');
+
+  // AI 开场白
+  const sys = SYSTEM_PROMPT(name, position, topic, city, um);
+  state.messages.push({ role: 'system', content: sys });
+  await streamAI('请开始这次访谈，向被访谈人打招呼并说明访谈目的，然后提第一个问题。');
+}
+
+// ─── chat ─────────────────────────────────────────────────
+/* 轮次徽标：刻意不设上限，也不在固定轮数催收尾。
+   ★ 不显示 "第 n/8 轮" 这类分母——8（GATE.minRounds）只是内部「素材够不够」的最低线，
+   一旦露出，被访谈人会误以为"聊满 8 轮就结束"，与"聊到内容够为止"的设计正好相反。
+   所以这里只给"已聊几轮"的进度感，够线后立刻转向"内容够不够"。
+   文案面向被访谈人，不要出现"素材/萃取"等内部术语。 */
+function updateRoundBadge() {
+  const badge = document.getElementById('round-badge');
+  const n = state.roundCount;
+  const a = assessInterview(state.messages);
+  const long = n >= GATE.softWarnRounds;
+
+  badge.textContent = n === 0
+    ? '访谈进行中'
+    : (n < GATE.minRounds
+      ? '已聊 ' + n + ' 轮'
+      : (long ? '已聊 ' + n + ' 轮 · 聊得比较久了' : '已聊 ' + n + ' 轮 · 内容比较充分了'));
+  badge.classList.toggle('ready', n >= GATE.minRounds && a.ok);
+
+  const btn = document.getElementById('report-btn');
+  if (btn) {
+    /* 不再用"还差 N 轮"——那会诱导凑轮数。只区分"能不能出报告"，
+       且措辞不承诺"再聊 N 轮就好"。 */
+    const canReport = n >= GATE.minRounds;
+    btn.textContent = canReport ? '生成报告' : '再聊一会儿';
+    btn.classList.toggle('not-ready', !canReport);
+    /* 不再用"聊久了就催生成"来打断。只有在「聊得久 且 素材仍偏薄」时
+       才轻推一下——这种情况多半是话题跑偏了，该看一眼是不是没问到点子上。 */
+    btn.classList.toggle('nudge', long && !a.ok);
+  }
+}
+
+function appendMsg(role, content, streaming = false) {
+  const wrap = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+  const initials = role === 'user' ? '我' : 'AI';
+  div.innerHTML = `
+    <div class="avatar ${role === 'user' ? 'user-av' : 'ai'}">${initials}</div>
+    <div class="bubble" id="bubble-${Date.now()}">${streaming ? '<span class="typing-content"></span>' : escHtml(content)}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  if (streaming) {
+    const inner = div.querySelector('.typing-content');
+    return (chunk) => {
+      inner.textContent += chunk;
+      wrap.scrollTop = wrap.scrollHeight;
+    };
+  }
+}
+
+function showTyping() {
+  const wrap = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = 'typing-msg';
+  div.innerHTML = `<div class="avatar ai">AI</div>
+    <div class="bubble"><div class="typing-indicator">
+      <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+    </div></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+function hideTyping() {
+  const el = document.getElementById('typing-msg');
+  if (el) el.remove();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+async function sendMessage() {
+  if (state.streaming) return;
+  const inp = document.getElementById('user-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = ''; inp.style.height = 'auto';
+
+  appendMsg('user', text);
+  state.messages.push({ role: 'user', content: text });
+  state.roundCount = countRounds(state.messages);   // 统一口径，避免计数器漂移
+  updateRoundBadge();
+  saveDraft();   // 先落盘用户这一句，即使此刻断线也不丢
+
+  await streamAI();
+}
+
+async function streamAI(injectedUserMsg = null) {
+  state.streaming = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const msgs = [...state.messages];
+  if (injectedUserMsg) {
+    // 开场白这类「系统代发」的指令也要进对话历史，
+    // 否则刷新续接后这一段上下文会凭空消失。
+    // internal:true 表示它是给 AI 的控制指令，不算被访谈人的发言——
+    // 回放与归档时都要滤掉，避免一线看到访谈提纲式的指令文字。
+    state.messages.push({ role: 'user', content: injectedUserMsg, internal: true });
+    msgs.push({ role: 'user', content: injectedUserMsg });
+  }
+
+  showTyping();
+
+  try {
+    const res = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: getApiHeaders(),
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash',
+        messages: buildContext(msgs),
+        stream: true,
+        max_tokens: 600,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      hideTyping();
+      appendMsg('ai', '请求失败：' + (err.error?.message || res.status) + '。请检查 API Key 是否正确。');
+      state.streaming = false;
+      document.getElementById('send-btn').disabled = false;
+      return;
+    }
+
+    hideTyping();
+    const push = appendMsg('ai', '', true);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+        try {
+          const j = JSON.parse(data);
+          const chunk = j.choices?.[0]?.delta?.content || '';
+          if (chunk) { push(chunk); full += chunk; }
+        } catch {}
+      }
+    }
+
+    state.messages.push({ role: 'assistant', content: full });
+
+  } catch (e) {
+    hideTyping();
+    appendMsg('ai', '网络错误：' + e.message);
+  }
+
+  state.streaming = false;
+  document.getElementById('send-btn').disabled = false;
+  saveDraft();   // 一轮问答完成，落盘
+}
+
+// ─── report ───────────────────────────────────────────────
+async function endAndReport() {
+  if (countRounds(state.messages) < 3) {
+    alert('访谈内容不够，请至少进行几轮对话后再生成报告。');
+    return;
+  }
+
+  const a = assessInterview(state.messages);
+
+  // 只有"聊得极少"才硬拦（3 轮以下已在上方处理）。
+  // 其余情况一律放行到报告页——那里会用内容覆盖度告诉用户缺什么，
+  // 而不是靠轮数/字数把人挡在门外。刻意不设轮次上限。
+  if (!a.ok && !state.reportRaw) {
+    showGatePanel(a);
+    return;
+  }
+
+  await generateReport();
+}
+
+/* 素材提示面板：先看"六个维度问到没有"，字数只作辅助。
+   萃取的价值判断标准是内容覆盖度，不是聊了多久。 */
+function showGatePanel(a) {
+  showScreen('report-screen');
+  renderReportMeta();
+  renderAlert([]);
+  renderCoverage(null);
+  const cls = (ok) => ok ? 'good' : 'bad';
+  const cov = assessCoverage(state.reportRaw || '', state.messages);
+  const chips = cov.dims.map(d =>
+    '<div class="cov-chip ' + (d.ok ? 'ok' : 'gap') + '" title="' + escHtml(d.probe) + '">'
+    + '<span class="cov-mark">' + (d.ok ? '✓' : '○') + '</span>'
+    + '<span class="cov-label">' + escHtml(d.label) + '</span>'
+    + '<span class="cov-note">' + escHtml(d.ok ? d.note : '还没问到 · ' + d.probe) + '</span></div>'
+  ).join('');
+  document.getElementById('report-content').innerHTML = `
+    <div class="gate-panel">
+      <div class="gate-title">素材还偏薄，现在生成多半是空话</div>
+      <div class="gate-desc">
+        报告里能写多少具体做法，取决于访谈里说了多少细节。下面是六个维度问到没问到，
+        返回继续访时对着 ○ 那几项补就够了——<b>不用在意聊了多少轮</b>。
+      </div>
+      <div class="cov-chips" style="margin:14px 0 16px">${chips}</div>
+      <div class="gate-desc" style="margin-bottom:14px">
+        接着聊时，把「多久一次、第一句话怎么说、用了什么、对方不回怎么办」这几样讲出来，就够用了。
+      </div>
+      <div class="gate-actions">
+        <button class="primary" onclick="backToChat()">返回继续访</button>
+        <button class="ghost" onclick="generateReport()">仍要生成报告</button>
+      </div>
+    </div>`;
+}
+
+async function generateReport() {
+  showScreen('report-screen');
+  renderReportMeta();
+  renderAlert([]);
+  renderCoverage(null);
+  document.getElementById('report-content').innerHTML = `
+    <div class="report-generating">
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      正在根据访谈内容生成报告，请稍候…
+    </div>`;
+
+  const { name, position, topic } = state.interviewee;
+  // 报告要用全量对话，但也要防超长访谈把请求撑爆——
+  // 用比对聊时更大的预算（报告需要更多细节），同样优先保留最近的。
+  const reportMsgs = [
+    ...buildContext(state.messages, CTX_MAX_CHARS_REPORT),
+    { role: 'user', content: REPORT_PROMPT(name, position, topic) }
+  ];
+
+  try {
+    const res = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: getApiHeaders(),
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash',
+        messages: reportMsgs,
+        stream: false,
+        max_tokens: 8000,   // deepseek-v4-flash 是推理模型：推理 token 也计入预算。
+                            // v2026.09.28 用 4600 够；09-29 提示词加了决策三段式/原话行/
+                            // 触发信号/失效边界后输出更重，推理也变长，
+                            // 实测 4600 两次都在 1300-1700 字处被 finish_reason:length 截断，
+                            // 8000 两次都完整 stop（2729/3024 字）。
+        temperature: 0.5,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || res.status);
+
+    const raw = data.choices?.[0]?.message?.content || '';
+    const truncated = data.choices?.[0]?.finish_reason === 'length';
+
+    // 后处理：把节标题归一成标准标题（模型常写成「## 核心做法」「避坑指南」这类）。
+    // 必须在赋值前做，否则归档的 report_md 里留着会导致按序号取值取空。
+    const normalized = normalizeReport(raw);
+    state.reportRaw = normalized;
+    renderReport(normalized);
+    renderAlert(buildReportAlerts(state.messages, normalized));
+    renderCoverage(assessCoverage(normalized, state.messages));
+    saveDraft();   // 报告已生成，落盘，便于断线后直接回看
+
+    if (truncated) {
+      alert('报告字数达到上限，末尾可能被截断了。建议点「返回访谈」补充几轮后重新生成，或直接检查最后两节内容是否完整。');
+    }
+
+  } catch (e) {
+    document.getElementById('report-content').innerHTML =
+      `<div class="report-section"><div class="content" style="color:var(--danger)">报告生成失败：${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function renderReportMeta() {
+  const { name, position, topic, city, um, owner, ownerOrg } = state.interviewee;
+  const today = new Date().toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' });
+  const ownerTxt = owner
+    ? escHtml(owner) + (ownerOrg ? '（' + escHtml(ownerOrg) + '）' : '')
+    : '—';
+  document.getElementById('report-meta').innerHTML = `
+    <div class="meta-item"><div class="meta-label">访谈对象</div><div class="meta-value">${escHtml(name)}</div></div>
+    <div class="meta-item"><div class="meta-label">岗位</div><div class="meta-value">${escHtml(position)}</div></div>
+    <div class="meta-item"><div class="meta-label">UM 号</div><div class="meta-value">${escHtml(um || '—')}</div></div>
+    <div class="meta-item"><div class="meta-label">所属城市</div><div class="meta-value">${escHtml(city || '—')}</div></div>
+    <div class="meta-item"><div class="meta-label">访谈日期</div><div class="meta-value">${today}</div></div>
+    <div class="meta-item"><div class="meta-label">后线对接人</div><div class="meta-value">${ownerTxt}</div></div>
+    <div class="meta-item" style="grid-column:1/-1"><div class="meta-label">案例主题</div><div class="meta-value">${escHtml(topic)}</div></div>`;
+}
+
+const SUBHEAD_RE = /^(?:\*{0,2}|【)\s*(做法|具体怎么做|具体做法|怎么做)\s*(?:\*{0,2}|】)\s*[:：]?\s*/;
+/* 键名要覆盖 REPORT_PROMPT 里教的全部写法，含斜杠复合键（频次/时机、话术/方法、
+   载体/工具、对方没反应时怎么办），否则模型规规矩矩按模板写反而识别不出来。 */
+const METHOD_KEY_RE = /^(?:[-*•]\s*)?(?:对方没反应时怎么办|频次|时机|周期|话术|方法|做法|载体|工具|渠道|对方反应|对方|客户反应|客户|注意|要点|条件|判断|标准|其他|备注)(?:\/(?:时机|方法|工具|周期|反应|怎么办|途径|事项|依据))*\s*[:：]/;
+
+function splitLines(text) {
+  return String(text || '').replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+/* 经验点要做成「做法 → 具体怎么做」的层级，纯粹为了好读：
+   一线扫一眼就能看出哪句是结论、哪几条是能照着做的动作。 */
+function looksStructured(lines) {
+  return lines.some(l => SUBHEAD_RE.test(l) || METHOD_KEY_RE.test(l));
+}
+
+const STEP_RE = /^(?:[-*•]\s*|\d+[.、）)]\s*)?([^:：]{1,14})[:：]\s*(.+)$/;
+
+function cleanKey(s) {
+  return String(s).replace(/^[-*•\s]+/, '').replace(/\s+$/, '').trim();
+}
+
+function renderStructured(text) {
+  const lines = splitLines(text);
+  const items = [];
+  let cur = null;
+
+  lines.forEach(line => {
+    const lead = line.match(SUBHEAD_RE);
+    if (lead && lead[1] === '做法') {
+      cur = { lead: line.replace(SUBHEAD_RE, '').trim(), steps: [] };
+      items.push(cur);
+      return;
+    }
+    if (lead) return;               // 「具体怎么做：」这行本身不显示，交给下面的键值行
+
+    // 一行一个键值对是期望格式。只有两种情况下才用分号拆：
+    //   ① 整行不含「键：值」结构 —— 说明是「频次：A；话术：B；载体：C」这种挤在一行的写法
+    //   ② 分号后面还跟着另一个键名（频次/话术/载体…）—— 才是真的多组
+    // 否则「对方没反应时怎么办：两次不回；节日再发一次」这种值内分号会被误拆。
+    const direct = line.match(STEP_RE);
+    if (direct) {
+      const tail = direct[2];
+      const hasNextKey = /[；;]\s*[^；;:：]{1,14}[:：]/.test(tail);
+      if (!hasNextKey) {
+        const step = { k: cleanKey(direct[1]), v: tail.trim() };
+        // 没有「做法」行开头的小节：键值行挂到独立条目上，不能静默丢掉
+        if (cur) cur.steps.push(step);
+        else items.push({ lead: '', steps: [step] });
+        return;
+      }
+    }
+    line.split(/[；;]/).map(s => s.trim()).filter(Boolean).forEach(part => {
+      const m = part.match(STEP_RE);
+      if (m && cur) cur.steps.push({ k: cleanKey(m[1]), v: m[2].trim() });
+      else if (cur) cur.steps.push({ k: '', v: part });
+      else items.push({ lead: part, steps: [] });
+    });
+  });
+
+  return items.map(it => {
+    if (!it.lead && !it.steps.length) return '';
+    const body = it.steps.map(s =>
+      s.k ? '<div class="exp-step"><span class="k">' + escHtml(s.k) + '</span><span class="v">' + escHtml(s.v) + '</span></div>'
+          : '<div class="exp-step"><span class="v">' + escHtml(s.v) + '</span></div>'
+    ).join('');
+    return '<div class="exp-item">'
+         + (it.lead ? '<div class="exp-lead">' + escHtml(it.lead) + '</div>' : '')
+         + (body ? '<div class="exp-body">' + body + '</div>' : '')
+         + '</div>';
+  }).join('');
+}
+
+function renderPlain(text) {
+  const lines = splitLines(text);
+  if (!lines.length) return '';
+  // 逐行 <div> 而不是整块 pre-wrap：一是换行稳定，二是不依赖 white-space 继承
+  return lines.map(l => {
+    const hasNum = /^\d+[.、）)]/.test(l);
+    return '<div class="ln' + (hasNum ? ' num' : '') + '">' + escHtml(l) + '</div>';
+  }).join('');
+}
+
+/* 去掉模型在正文首行复述的章节标题。
+   原来用 /^[^\n]*\n/ 粗暴砍掉第一行，遇到正文前有空行时砍不干净，
+   标题就留在了正文里（表现为第 2 节往后每节标题重复一次）。 */
+function stripSectionHeading(text, title) {
+  let t = String(text || '').replace(/^\s+/, '');
+  t = t.replace(/^\s*(?:#{1,6}\s*)?(?:\d+[.、）)]\s*)?/, '');
+  t = t.replace(/^[\s*_【]*(?:\d+[.、）)]\s*)?/, '');
+  const esc = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  t = t.replace(new RegExp('^' + esc + '\\s*[】*_]*\\s*[:：]?\\s*\\n?'), '');
+  return t.replace(/^\s+/, '').trim();
+}
+
+/* 节标题归一：模型偶尔把标题写成同义词或带 markdown 装饰
+   （「## 核心做法」「他做对了什么」「避坑指南」），导致按序号取值取空。
+   这里只看每节的第一行，命中别名就替换成标准标题；认不出来的标题原样保留，
+   不猜、不硬塞，避免把内容挪到错误的小节里。 */
+const SECTION_ALIASES = [
+  ['背景与挑战', ['背景', '案例背景', '背景与问题', '背景介绍', '事情背景', '问题与挑战']],
+  ['核心做法', ['做法', '具体做法', '核心动作', '他做了什么', '关键做法', '主要做法', '他的做法']],
+  ['关键判断与取舍', ['关键判断', '判断与取舍', '关键决策', '决策与取舍', '取舍', '关键取舍', '判断']],
+  ['结果', ['成果', '结果与效果', '效果', '最终结果', '结果数据', '业绩结果', '结果与数据']],
+  ['可复制的经验点', ['可复制的经验', '经验点', '可复制经验', '经验总结', '可复制的做法']],
+  ['新人容易踩的坑', ['新人容易踩坑', '容易踩的坑', '避坑指南', '踩坑提醒', '新人避坑', '常见误区']],
+  ['海报摘要', ['海报信息', '海报文案', '摘要', '海报要点']],
+];
+
+function normalizeSectionTitle(line) {
+  const raw = String(line || '').trim();
+  if (!raw) return '';
+  // 剥掉 markdown 装饰：## 标题、**标题**、【标题】、1. 标题、标题：
+  const core = raw
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/^[-*•]\s*/, '')
+    .replace(/^(?:\d+[.、）)]|第[一二三四五六七八九十]+[节部]|[一二三四五六七八九十]+[、.）)])\s*/, '')
+    .replace(/^[\s*_【]+/, '')
+    .replace(/[\s*_】]+$/, '')
+    .replace(/[\s:：]+$/, '')
+    .trim();
+  if (!core) return '';
+  if (SECTION_TITLES.indexOf(core) >= 0) return core;   // 本来就是标准标题
+  for (const [std, aliases] of SECTION_ALIASES) {
+    if (aliases.indexOf(core) >= 0) return std;
+  }
+  return '';   // 认不出来 → 不动
+}
+
+/* 分隔符容错修复：模型偶尔不写 ---SECTION---，而是写 --- / ---- / *** / === / 空行。
+   实测（2026-09-29）加了原话/参照系等更重的要求后，模型把分隔符写成裸 ---，
+   结果整份报告被当成 1 节 → 报告页第 2-7 节全显示「本节内容未获取到」，
+   归档的 report_md 也一起坏掉。这里在做标题归一之前先把分隔符修回来。
+
+   判据要严：只有「一行是纯分隔符变体」**且**「下一行非空行正好是一个节标题（标准名或别名）」
+   才认定为真分隔符。这样正文里的水平线、markdown 分隔线都不会被误判。 */
+const SEP_LINE_RE = /^\s*(?:-{3,}|={3,}|\*{3,}|_{3,}|—{3,})\s*$/;
+/* 带有 SECTION 字样但格式不规范的分隔符，例如「--- SECTION ---」「--SECTION--」「***SECTION***」 */
+const SEP_SECTION_RE = /^\s*[-=*_—]{2,}\s*S\s*E\s*C\s*T\s*I\s*O\s*N\s*[-=*_—]{2,}\s*$/i;
+
+function repairSectionSeparators(raw) {
+  const text = String(raw || '');
+  if (!text) return text;
+  /* 已经规规矩矩写了 6 个标准分隔符，就不动它（避免把正确输出改坏） */
+  const stdCount = (text.match(/---SECTION---/g) || []).length;
+  if (stdCount >= 6) return text;
+
+  const lines = text.split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (SEP_SECTION_RE.test(line)) { out.push('---SECTION---'); continue; }
+    if (SEP_LINE_RE.test(line)) {
+      /* 往后找第一个非空行，看它是不是节标题 */
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      const next = j < lines.length ? lines[j].trim() : '';
+      if (next && normalizeSectionTitle(next)) {
+        out.push('---SECTION---');
+        continue;   // 丢弃这行伪分隔符，换成标准分隔符
+      }
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+/* 报告后处理：先修分隔符，再把各节开头的标题行归一成标准标题。
+   只改标题那一行与分隔符行，正文一个字不动。 */
+function normalizeReport(raw) {
+  const text = repairSectionSeparators(String(raw || ''));
+  if (!text) return text;
+  return text.split(/---SECTION---/).map(part => {
+    const lines = part.split('\n');
+    // 找出第一个非空行
+    let idx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim()) { idx = i; break; }
+    }
+    if (idx < 0) return part;
+    const std = normalizeSectionTitle(lines[idx]);
+    if (std) lines[idx] = std;   // 命中别名 → 换掉这一行；没命中 → 保持原样
+    return lines.join('\n');
+  }).join('---SECTION---');
+}
+
+function renderReport(raw) {
+  const parts = String(raw || '').split('---SECTION---');
+  const container = document.getElementById('report-content');
+  container.innerHTML = '';
+
+  SECTION_TITLES.forEach((title, i) => {
+    // 「海报摘要」是给一图流海报用的结构化数据，不是给访谈对象读的正文，
+    // 因此不在报告页里渲染成第七节；它随 report_md 原样归档，
+    // 由管理端生成海报时解析。
+    if (title === POSTER_SECTION_TITLE) return;
+
+    const text = stripSectionHeading(parts[i] || '', title);
+    const empty = '（本节内容未获取到，请尝试重新生成）';
+    let inner;
+    if (!text) {
+      inner = escHtml(empty);
+    } else if (title === '可复制的经验点' && looksStructured(splitLines(text))) {
+      inner = renderStructured(text);   // 结构化渲染，避免裸 JSON 感
+    } else {
+      inner = renderPlain(text);
+    }
+    const sec = document.createElement('div');
+    sec.className = 'report-section';
+    sec.innerHTML = `<h3 data-num="${i + 1}">${title}</h3><div class="content">${inner}</div>`;
+    container.appendChild(sec);
+  });
+}
+
+function copyReport() {
+  const { name, position, topic, city, um, owner, ownerOrg } = state.interviewee;
+  const today = new Date().toLocaleDateString('zh-CN');
+  let text = `案例经验报告\n访谈对象：${name}（${position}）\nUM 号：${um || '—'}\n所属城市：${city || '—'}\n` +
+             `后线对接人：${owner || '—'}${ownerOrg ? '（' + ownerOrg + '）' : ''}\n` +
+             `案例主题：${topic}\n访谈日期：${today}\n\n`;
+  document.querySelectorAll('#report-content .report-section').forEach((sec, i) => {
+    // 用标题反查序号：海报摘要节不渲染，不能靠 DOM 下标对应 SECTION_TITLES
+    const heading = sec.querySelector('h3');
+    const title = heading ? heading.textContent.trim() : '';
+    if (title === POSTER_SECTION_TITLE) return;
+    const ord = SECTION_TITLES.indexOf(title);
+    text += `${(ord >= 0 ? ord + 1 : i + 1)}. ${title}\n`;
+    const lines = [];
+    sec.querySelectorAll('.exp-lead, .ln').forEach(el => lines.push(el.textContent.trim()));
+    sec.querySelectorAll('.exp-step').forEach(el => {
+      const k = el.querySelector('.k');
+      const v = el.querySelector('.v');
+      lines.push((k ? '    - ' + k.textContent.trim() + '：' : '    ') + (v ? v.textContent.trim() : ''));
+    });
+    text += (lines.length ? lines.join('\n') : sec.querySelector('.content').textContent.trim()) + '\n\n';
+  });
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-all-btn');
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => { btn.textContent = '复制报告'; }, 2500);
+  });
+}
+
+// ─── 归档 ─────────────────────────────────────────────────
+function resetArchiveUI() {
+  const btn = document.getElementById('archive-btn');
+  const st = document.getElementById('archive-status');
+  if (btn) { btn.disabled = false; btn.classList.remove('done'); btn.textContent = '提交归档'; }
+  if (st) { st.textContent = ''; st.className = 'archive-status'; }
+}
+
+async function submitArchive() {
+  const btn = document.getElementById('archive-btn');
+  const st  = document.getElementById('archive-status');
+  if (state.archived) return;
+  if (!SUBMIT_URL) {
+    st.textContent = '归档服务未配置';
+    st.className = 'archive-status err';
+    return;
+  }
+  if (!state.reportRaw) {
+    st.textContent = '报告尚未生成，无法归档';
+    st.className = 'archive-status err';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '归档中…';
+  st.textContent = '';
+  st.className = 'archive-status';
+
+  const iv = state.interviewee;
+  const transcript = state.messages
+    .filter(m => m.role !== 'system' && !m.internal)
+    .map(m => ({ role: m.role, content: m.content }));
+
+  // 先把两张图在浏览器里画好——服务端渲染不了（云函数内存 256MB），
+  // 随提交一起传上去，服务端自动发信时就能带上图。画失败不阻塞归档：
+  // 哪张失败就少带哪张，服务端照发（正文本身就是海报版式 + 报告全文）。
+  btn.textContent = '生成图片（1/2）…';
+  const posterPng = await buildPosterPng('flow');
+  btn.textContent = '生成图片（2/2）…';
+  const fullPng = await buildPosterPng('full');
+  btn.textContent = '归档中…';
+
+  const payload = {
+    city: iv.city,
+    interviewee_name: iv.name,
+    interviewee_position: iv.position,
+    interviewee_um: iv.um || null,
+    topic: iv.topic,
+    backend_owner_name: iv.owner || null,
+    backend_owner_org: iv.ownerOrg || null,
+    round_count: countRounds(state.messages),   // 与 transcript 口径一致，避免计数器漂移
+    report_md: state.reportRaw,
+    transcript,
+    poster_png_base64: posterPng,   // 简略一图流；可能为 null：服务端自动降级
+    full_png_base64: fullPng,       // 完整报告长图；可能为 null：服务端自动降级
+  };
+
+  try {
+    const res = await fetch(SUBMIT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.fields ? ('缺少：' + data.fields.join('、')) : (data.error || ('HTTP ' + res.status));
+      throw new Error(msg);
+    }
+
+    state.archived = true;
+    btn.classList.add('done');
+    btn.textContent = '已归档 ✓';
+    // 归档成功即自动发信（服务端异步发出）；这里把发送状态一并告知，
+    // 免得运营以为还要手动点一次。发送结果以管理页为准。
+    const imgNote = state.posterBlocked === 'poster_summary_missing'
+      ? '（本次未生成一图流：报告缺「海报摘要」节，只能用完整报告长图）'
+      : (posterPng && fullPng ? '（含两张图）'
+        : posterPng ? '（仅一图流）'
+        : fullPng ? '（仅完整报告长图）' : '（无图）');
+    st.textContent = '归档编号 #' + (data.id != null ? data.id : '—') +
+      '，报告邮件已自动发送' + imgNote;
+    st.className = 'archive-status ok';
+    clearDraft();   // 已归档入库，本地草稿完成使命
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '重新提交归档';
+    st.textContent = '归档失败：' + e.message;
+    st.className = 'archive-status err';
+  }
+}
+
+/* 执行到此处 = 主脚本完整跑完（无启动期异常）。若为 false，说明上面某行崩了。 */
+window.__appBooted = true;
+window.__appBootMs = Date.now() - (window.__appStartTs || Date.now());
+
+function backToChat() { showScreen('chat-screen'); }
+function resetToSetup() {
+  if (!confirm('重置将清除当前访谈记录，确认？')) return;
+  clearDraft();
+  state.messages = []; state.roundCount = 0; state.streaming = false;
+  state.reportRaw = ''; state.archived = false;
+  state.interviewee = { name:'', position:'', topic:'', city:'', um:'', owner:'', ownerOrg:'' };
+  document.getElementById('draft-bar').style.display = 'none';
+  showScreen('setup-screen');
+}
+</script>
+</body>
+</html>

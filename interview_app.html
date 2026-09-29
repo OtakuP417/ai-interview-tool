@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 案例访谈助手</title>
+<style>
+:root {
+  --bg: oklch(97% 0.005 250);
+  --surface: oklch(100% 0 0);
+  --surface2: oklch(95% 0.008 250);
+  --surface3: oklch(92% 0.01 250);
+  --border: oklch(88% 0.01 250);
+  --border-strong: oklch(80% 0.015 250);
+  --text: oklch(18% 0.02 250);
+  --text-muted: oklch(48% 0.02 250);
+  --text-hint: oklch(65% 0.015 250);
+  --accent: oklch(54% 0.18 248);
+  --accent-hover: oklch(48% 0.18 248);
+  --accent-light: oklch(95% 0.06 248);
+  --accent-text: oklch(36% 0.14 248);
+  --success: oklch(52% 0.16 158);
+  --success-light: oklch(95% 0.05 158);
+  --danger: oklch(52% 0.18 20);
+  --danger-light: oklch(96% 0.05 20);
+  --warning-light: oklch(96% 0.06 75);
+  --warning-text: oklch(40% 0.16 75);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; min-height: 100dvh; }
+
+/* ── screens ── */
+.screen { display: none; min-height: 100dvh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ── setup screen ── */
+#setup-screen {
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.setup-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 32px 28px 28px;
+  width: 100%;
+  max-width: 460px;
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+.brand-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-icon svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+.brand-name { font-size: 16px; font-weight: 500; }
+.brand-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+
+.form-group { margin-bottom: 16px; }
+.form-group:last-of-type { margin-bottom: 0; }
+label { display: block; font-size: 12.5px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; }
+label .req { color: var(--danger); margin-left: 2px; }
+input, textarea, select {
+  width: 100%;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 13.5px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, textarea:focus { border-color: var(--accent); background: var(--surface); }
+textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
+.input-hint { font-size: 11.5px; color: var(--text-hint); margin-top: 4px; }
+
+.section-sep {
+  display: flex; align-items: center; gap: 10px;
+  margin: 20px 0 16px;
+}
+.section-sep span { font-size: 11.5px; font-weight: 500; color: var(--text-hint); white-space: nowrap; }
+.section-sep::before, .section-sep::after {
+  content: ''; flex: 1; height: 0.5px; background: var(--border);
+}
+
+.apikey-row { display: flex; gap: 8px; }
+.apikey-row input { flex: 1; font-family: "SF Mono", Consolas, monospace; font-size: 12.5px; }
+.icon-btn {
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.icon-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+
+.start-btn {
+  width: 100%;
+  margin-top: 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.start-btn:hover { background: var(--accent-hover); }
+.start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.error-msg {
+  background: var(--danger-light);
+  border: 0.5px solid oklch(82% 0.1 20);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  color: var(--danger);
+  margin-top: 12px;
+  display: none;
+}
+
+/* ── chat screen ── */
+#chat-screen { background: var(--bg); }
+
+.chat-header {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.chat-header-info { flex: 1; min-width: 0; }
+.chat-header-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-header-meta { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-badge {
+  font-size: 11px; font-weight: 500;
+  background: var(--success-light);
+  color: var(--success);
+  border: 0.5px solid oklch(78% 0.1 158);
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.header-btn {
+  background: none; border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 10px; font-size: 12px; color: var(--text-muted); cursor: pointer;
+  font-family: inherit; white-space: nowrap; transition: all 0.15s;
+}
+.header-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+}
+
+.msg {
+  display: flex;
+  gap: 10px;
+  max-width: 100%;
+  animation: fadeUp 0.18s ease;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.msg.user { flex-direction: row-reverse; }
+
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 500;
+  flex-shrink: 0; margin-top: 2px;
+}
+.avatar.ai { background: var(--accent); color: #fff; }
+.avatar.user-av { background: var(--surface3); color: var(--text-muted); border: 0.5px solid var(--border); }
+
+.bubble {
+  max-width: min(80%, 480px);
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg.ai .bubble {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-top-left-radius: 4px;
+  color: var(--text);
+}
+.msg.user .bubble {
+  background: var(--accent);
+  color: #fff;
+  border-top-right-radius: 4px;
+}
+
+.typing-indicator {
+  display: flex; gap: 4px; align-items: center; padding: 12px 14px;
+}
+.typing-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-hint);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.input-area {
+  background: var(--surface);
+  border-top: 0.5px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+.input-area textarea {
+  flex: 1;
+  min-height: 40px;
+  max-height: 160px;
+  resize: none;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+.input-area textarea:focus { border-color: var(--accent); background: var(--surface); }
+.send-btn {
+  width: 40px; height: 40px;
+  background: var(--accent);
+  border: none; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.send-btn:hover { background: var(--accent-hover); }
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.send-btn svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.report-trigger {
+  text-align: center;
+  padding: 0 16px 4px;
+  flex-shrink: 0;
+}
+.report-trigger button {
+  background: none; border: 0.5px dashed var(--border-strong);
+  border-radius: var(--radius-sm); padding: 7px 16px;
+  font-size: 12.5px; color: var(--text-muted); cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.report-trigger button:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent-light); }
+
+/* ── report screen ── */
+#report-screen { padding: 0; }
+
+.report-header {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.report-header h2 { font-size: 15px; font-weight: 500; flex: 1; }
+.report-header .back-btn {
+  background: none; border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 12px; font-size: 12.5px; color: var(--text-muted); cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.report-header .back-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+.copy-all-btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 7px 14px;
+  font-size: 12.5px; font-weight: 500; font-family: inherit; cursor: pointer;
+  transition: background 0.15s;
+}
+.copy-all-btn:hover { background: var(--accent-hover); }
+
+.report-body {
+  flex: 1; overflow-y: auto; padding: 24px 20px 48px;
+  max-width: 680px; margin: 0 auto; width: 100%;
+}
+.report-meta {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-label { font-size: 11px; font-weight: 500; color: var(--text-hint); letter-spacing: 0.03em; text-transform: uppercase; }
+.meta-value { font-size: 13.5px; color: var(--text); font-weight: 500; }
+
+.report-section {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+}
+.report-section h3 {
+  font-size: 13.5px; font-weight: 500; color: var(--accent-text);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.report-section h3::before {
+  content: attr(data-num);
+  width: 20px; height: 20px;
+  background: var(--accent-light);
+  border: 0.5px solid oklch(82% 0.1 248);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; color: var(--accent);
+  flex-shrink: 0;
+}
+.report-section .content {
+  font-size: 13.5px; line-height: 1.75; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+}
+.report-generating {
+  display: flex; align-items: center; gap: 10px;
+  padding: 20px;
+  color: var(--text-muted); font-size: 13.5px;
+}
+
+.loading-dots { display: flex; gap: 4px; }
+.loading-dots span {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent); opacity: 0.3;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── responsive ── */
+@media (max-width: 480px) {
+  .setup-card { padding: 24px 20px 20px; }
+  .report-meta { grid-template-columns: 1fr; }
+  .bubble { max-width: 92%; }
+}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SETUP SCREEN ═══════════════ -->
+<div id="setup-screen" class="screen active">
+  <div class="setup-card">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">AI 案例访谈助手</div>
+        <div class="brand-sub">平安融易 · 销售团队经验萃取</div>
+      </div>
+    </div>
+
+    <div class="section-sep"><span>被访谈人信息</span></div>
+
+    <div class="form-group">
+      <label>姓名 <span class="req">*</span></label>
+      <input type="text" id="f-name" placeholder="例：张伟" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>岗位 <span class="req">*</span></label>
+      <input type="text" id="f-position" placeholder="例：咨询顾问 / 营业部经理">
+    </div>
+    <div class="form-group">
+      <label>本次访谈主题 <span class="req">*</span></label>
+      <textarea id="f-topic" placeholder="例：客户转介绍成交案例&#10;孤儿单盘活经验&#10;新人快速签约方法"></textarea>
+    </div>
+
+    <div id="apikey-section">
+    <div class="section-sep"><span>模型配置</span></div>
+
+    <div class="form-group">
+      <label>DeepSeek API Key <span class="req">*</span></label>
+      <div class="apikey-row">
+        <input type="password" id="f-apikey" placeholder="sk-..." autocomplete="off">
+        <button class="icon-btn" id="toggle-key" title="显示/隐藏">
+          <svg id="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">Key 仅保存在本地浏览器，不上传任何服务器。申请地址：platform.deepseek.com</div>
+    </div>
+    </div>
+
+    <div id="setup-error" class="error-msg"></div>
+
+    <button class="start-btn" id="start-btn" onclick="startInterview()">开始访谈</button>
+  </div>
+</div>
+
+<!-- ═══════════════ CHAT SCREEN ═══════════════ -->
+<div id="chat-screen" class="screen">
+  <div class="chat-header">
+    <div class="chat-header-info">
+      <div class="chat-header-name" id="header-name">—</div>
+      <div class="chat-header-meta" id="header-meta">—</div>
+    </div>
+    <span class="header-badge" id="round-badge">第 0 轮</span>
+    <button class="header-btn" onclick="endAndReport()">生成报告</button>
+    <button class="header-btn" onclick="resetToSetup()">重置</button>
+  </div>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="report-trigger">
+    <button onclick="endAndReport()">访谈已充分 · 点此生成案例报告 →</button>
+  </div>
+
+  <div class="input-area">
+    <textarea id="user-input" placeholder="输入回复…" rows="1"
+      onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="send-btn" id="send-btn" onclick="sendMessage()" title="发送">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════ REPORT SCREEN ═══════════════ -->
+<div id="report-screen" class="screen">
+  <div class="report-header">
+    <button class="back-btn" onclick="backToChat()">← 返回访谈</button>
+    <h2>案例经验报告</h2>
+    <button class="copy-all-btn" id="copy-all-btn" onclick="copyReport()">复制报告</button>
+  </div>
+  <div class="report-body">
+    <div class="report-meta" id="report-meta"></div>
+    <div id="report-content"></div>
+  </div>
+</div>
+
+<script>
+// ─── 部署配置 ─────────────────────────────────────────
+// 方式一（推荐）：使用 Cloudflare Worker 代理
+//   填入 Worker 地址后，API Key 由服务端保管，前端源码中不会出现 Key
+//   例：https://interview-proxy.yourname.workers.dev
+const PROXY_URL = 'https://interview-proxy.100000000.workers.dev';
+
+// 方式二：直接在此嵌入 API Key（任何人查看源码都能看到，仅内网使用时考虑）
+const BUILT_IN_API_KEY = '';
+// ──────────────────────────────────────────────────────
+
+const API_ENDPOINT = PROXY_URL || 'https://api.deepseek.com/chat/completions';
+
+function getApiHeaders() {
+  if (PROXY_URL) return { 'Content-Type': 'application/json' };
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + (BUILT_IN_API_KEY || state.apiKey),
+  };
+}
+
+// ─── state ───────────────────────────────────────────────
+let state = {
+  apiKey: '',
+  interviewee: { name: '', position: '', topic: '' },
+  messages: [],   // {role, content}
+  roundCount: 0,
+  streaming: false,
+};
+
+const SYSTEM_PROMPT = (n, p, t) => `你是一名专业的案例访谈员，服务于平安融易西安分公司的销售团队。你的任务是通过结构化对话，帮助被访谈人梳理并沉淀一个真实的销售案例或工作经验，最终形成可供全员学习的经验案例。
+
+【被访谈人信息】
+姓名：${n}
+岗位：${p}
+本次访谈主题：${t}
+
+【角色定位】
+你是一个有亲和力、善于倾听的访谈员，不是考官，不是评分者。用鼓励性语气让对方放松，愿意分享细节。每次只问一个问题，不要连续提多个问题。使用口语化中文，避免生硬书面体。
+
+【访谈框架】按顺序推进，每个维度深入挖掘后再进入下一个：
+1. 破冰（1-2轮）：介绍访谈目的，让对方放松
+2. 背景了解（2-3轮）：案例发生的背景和挑战
+3. 具体行动（3-4轮）：具体做了哪些动作，关键步骤
+4. 结果与数据（1-2轮）：最终效果，有无数据
+5. 关键决策（1-2轮）：重要判断与取舍及依据
+6. 可复制经验（2-3轮）：哪些情况下其他同事可以参考，新人注意什么
+7. 收尾（1轮）：感谢对方，告知将整理成报告
+
+【追问规则】
+- 回答笼统时（"做了很多工作"）→ 追问具体动作
+- 给出数字时 → 追问背后逻辑
+- 提到客户反应时 → 追问客户原话或具体表现
+- 说"运气好"时 → 追问哪些可控因素起了作用
+
+【结束判断】满足以下条件时主动提出结束：已完成至少15轮对话；六个维度均有实质内容；最后确认："我已经收集到了很丰富的信息，我来帮你整理成报告，你看还有什么想补充的吗？"
+
+【约束】不评价对方工作好坏；不透露是AI（如被问，说"我是访谈助手"）；每次回复控制在100字以内；不跳过任何维度。`;
+
+const REPORT_PROMPT = (n, p, t) => `请根据以上完整的访谈对话内容，生成一份结构化案例经验报告。
+
+严格按照以下格式输出，每个部分之间用"---SECTION---"分隔：
+
+背景与挑战
+（2-3句话描述案例发生的背景，面临什么问题或机会）
+---SECTION---
+核心做法
+（按步骤列出，每步写清具体动作，用"1. 2. 3."编号）
+---SECTION---
+关键判断与取舍
+（记录过程中的重要决策点，以及做出该决策的依据）
+---SECTION---
+结果
+（量化结果优先；无数据时写对方的描述性反馈）
+---SECTION---
+可复制的经验点
+（用"在……情况下，可以……"的格式，写2-4条，每条一行）
+---SECTION---
+新人注意事项
+（写2-3条容易踩坑的地方，每条一行）
+
+访谈对象：${n}（${p}）
+案例主题：${t}
+请仅输出报告内容，不要有前言或后记。`;
+
+const SECTION_TITLES = ['背景与挑战','核心做法','关键判断与取舍','结果','可复制的经验点','新人注意事项'];
+
+// ─── setup ───────────────────────────────────────────────
+window.onload = () => {
+  // 如果配置了代理，隐藏 API Key 输入区域
+  if (PROXY_URL) {
+    const sec = document.getElementById('apikey-section');
+    if (sec) sec.style.display = 'none';
+  } else {
+    const saved = localStorage.getItem('ds_key');
+    if (saved) document.getElementById('f-apikey').value = saved;
+    document.getElementById('toggle-key').onclick = () => {
+      const inp = document.getElementById('f-apikey');
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    };
+  }
+};
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function showError(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+function clearError() { document.getElementById('setup-error').style.display = 'none'; }
+
+async function startInterview() {
+  clearError();
+  const name = document.getElementById('f-name').value.trim();
+  const position = document.getElementById('f-position').value.trim();
+  const topic = document.getElementById('f-topic').value.trim();
+  if (!name) return showError('请填写被访谈人姓名');
+  if (!position) return showError('请填写岗位');
+  if (!topic) return showError('请填写访谈主题');
+
+  // 仅在无代理且无内置 Key 时才要求用户输入
+  let apiKey = BUILT_IN_API_KEY;
+  if (!PROXY_URL && !apiKey) {
+    apiKey = document.getElementById('f-apikey').value.trim();
+    if (!apiKey) return showError('请填写 DeepSeek API Key');
+    if (!apiKey.startsWith('sk-')) return showError('API Key 格式不正确，应以 sk- 开头');
+    localStorage.setItem('ds_key', apiKey);
+  }
+
+  state.apiKey = apiKey;
+  state.interviewee = { name, position, topic };
+  state.messages = [];
+  state.roundCount = 0;
+
+  document.getElementById('header-name').textContent = name + ' · ' + position;
+  document.getElementById('header-meta').textContent = '访谈主题：' + topic;
+  document.getElementById('messages').innerHTML = '';
+  updateRoundBadge();
+
+  showScreen('chat-screen');
+
+  // AI 开场白
+  const sys = SYSTEM_PROMPT(name, position, topic);
+  state.messages.push({ role: 'system', content: sys });
+  await streamAI('请开始这次访谈，向被访谈人打招呼并说明访谈目的，然后提第一个问题。');
+}
+
+// ─── chat ─────────────────────────────────────────────────
+function updateRoundBadge() {
+  document.getElementById('round-badge').textContent = '第 ' + state.roundCount + ' 轮';
+}
+
+function appendMsg(role, content, streaming = false) {
+  const wrap = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+  const initials = role === 'user' ? '我' : 'AI';
+  div.innerHTML = `
+    <div class="avatar ${role === 'user' ? 'user-av' : 'ai'}">${initials}</div>
+    <div class="bubble" id="bubble-${Date.now()}">${streaming ? '<span class="typing-content"></span>' : escHtml(content)}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  if (streaming) {
+    const inner = div.querySelector('.typing-content');
+    return (chunk) => {
+      inner.textContent += chunk;
+      wrap.scrollTop = wrap.scrollHeight;
+    };
+  }
+}
+
+function showTyping() {
+  const wrap = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg ai'; div.id = 'typing-msg';
+  div.innerHTML = `<div class="avatar ai">AI</div>
+    <div class="bubble"><div class="typing-indicator">
+      <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+    </div></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+function hideTyping() {
+  const el = document.getElementById('typing-msg');
+  if (el) el.remove();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+async function sendMessage() {
+  if (state.streaming) return;
+  const inp = document.getElementById('user-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = ''; inp.style.height = 'auto';
+
+  appendMsg('user', text);
+  state.messages.push({ role: 'user', content: text });
+  state.roundCount++;
+  updateRoundBadge();
+
+  await streamAI();
+}
+
+async function streamAI(injectedUserMsg = null) {
+  state.streaming = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const msgs = [...state.messages];
+  if (injectedUserMsg) {
+    msgs.push({ role: 'user', content: injectedUserMsg });
+  }
+
+  showTyping();
+
+  try {
+    const res = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: getApiHeaders(),
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: msgs.filter(m => m.role !== 'system' ? true : m).slice(0, 40),
+        stream: true,
+        max_tokens: 600,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      hideTyping();
+      appendMsg('ai', '请求失败：' + (err.error?.message || res.status) + '。请检查 API Key 是否正确。');
+      state.streaming = false;
+      document.getElementById('send-btn').disabled = false;
+      return;
+    }
+
+    hideTyping();
+    const push = appendMsg('ai', '', true);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+        try {
+          const j = JSON.parse(data);
+          const chunk = j.choices?.[0]?.delta?.content || '';
+          if (chunk) { push(chunk); full += chunk; }
+        } catch {}
+      }
+    }
+
+    state.messages.push({ role: 'assistant', content: full });
+
+  } catch (e) {
+    hideTyping();
+    appendMsg('ai', '网络错误：' + e.message);
+  }
+
+  state.streaming = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ─── report ───────────────────────────────────────────────
+async function endAndReport() {
+  if (state.messages.filter(m => m.role === 'user').length < 3) {
+    alert('访谈内容不够，请至少进行几轮对话后再生成报告。');
+    return;
+  }
+
+  showScreen('report-screen');
+  renderReportMeta();
+  document.getElementById('report-content').innerHTML = `
+    <div class="report-generating">
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      正在根据访谈内容生成报告，请稍候…
+    </div>`;
+
+  const { name, position, topic } = state.interviewee;
+  const reportMsgs = [
+    ...state.messages,
+    { role: 'user', content: REPORT_PROMPT(name, position, topic) }
+  ];
+
+  try {
+    const res = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: getApiHeaders(),
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: reportMsgs,
+        stream: false,
+        max_tokens: 2000,
+        temperature: 0.5,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || res.status);
+
+    const raw = data.choices?.[0]?.message?.content || '';
+    renderReport(raw);
+
+  } catch (e) {
+    document.getElementById('report-content').innerHTML =
+      `<div class="report-section"><div class="content" style="color:var(--danger)">报告生成失败：${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function renderReportMeta() {
+  const { name, position, topic } = state.interviewee;
+  const today = new Date().toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' });
+  document.getElementById('report-meta').innerHTML = `
+    <div class="meta-item"><div class="meta-label">访谈对象</div><div class="meta-value">${escHtml(name)}</div></div>
+    <div class="meta-item"><div class="meta-label">岗位</div><div class="meta-value">${escHtml(position)}</div></div>
+    <div class="meta-item"><div class="meta-label">案例主题</div><div class="meta-value">${escHtml(topic)}</div></div>
+    <div class="meta-item"><div class="meta-label">访谈日期</div><div class="meta-value">${today}</div></div>`;
+}
+
+function renderReport(raw) {
+  const parts = raw.split('---SECTION---');
+  const container = document.getElementById('report-content');
+  container.innerHTML = '';
+
+  SECTION_TITLES.forEach((title, i) => {
+    const text = (parts[i] || '').replace(/^[^\n]*\n/, '').trim();
+    const sec = document.createElement('div');
+    sec.className = 'report-section';
+    sec.innerHTML = `<h3 data-num="${i + 1}">${title}</h3><div class="content">${escHtml(text || '（本节内容未获取到，请尝试重新生成）')}</div>`;
+    container.appendChild(sec);
+  });
+}
+
+function copyReport() {
+  const { name, position, topic } = state.interviewee;
+  const today = new Date().toLocaleDateString('zh-CN');
+  let text = `案例经验报告\n访谈对象：${name}（${position}）\n案例主题：${topic}\n访谈日期：${today}\n\n`;
+  document.querySelectorAll('#report-content .report-section').forEach((sec, i) => {
+    text += `${i + 1}. ${SECTION_TITLES[i]}\n`;
+    text += sec.querySelector('.content').textContent + '\n\n';
+  });
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-all-btn');
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => { btn.textContent = '复制报告'; }, 2500);
+  });
+}
+
+function backToChat() { showScreen('chat-screen'); }
+function resetToSetup() {
+  if (!confirm('重置将清除当前访谈记录，确认？')) return;
+  state.messages = []; state.roundCount = 0; state.streaming = false;
+  showScreen('setup-screen');
+}
+</script>
+</body>
+</html>

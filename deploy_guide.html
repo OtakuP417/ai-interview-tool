@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>部署指南 · AI 案例访谈助手</title>
+<style>
+:root {
+  --bg: oklch(97% 0.005 250);
+  --surface: oklch(100% 0 0);
+  --surface2: oklch(95% 0.008 250);
+  --border: oklch(88% 0.01 250);
+  --text: oklch(18% 0.02 250);
+  --text-muted: oklch(48% 0.02 250);
+  --text-hint: oklch(65% 0.015 250);
+  --accent: oklch(54% 0.18 248);
+  --accent-light: oklch(95% 0.06 248);
+  --accent-text: oklch(36% 0.14 248);
+  --success: oklch(52% 0.16 158);
+  --success-light: oklch(95% 0.05 158);
+  --warning-light: oklch(96% 0.06 75);
+  --warning-text: oklch(40% 0.16 75);
+  --danger: oklch(52% 0.18 20);
+  --danger-light: oklch(96% 0.05 20);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.7; }
+
+.page { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
+
+.header { margin-bottom: 36px; }
+.header h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.header p { color: var(--text-muted); font-size: 13.5px; }
+
+.badge {
+  display: inline-block; font-size: 11px; font-weight: 500;
+  background: var(--success-light); color: var(--success);
+  border: 0.5px solid oklch(78% 0.1 158);
+  border-radius: 4px; padding: 2px 8px; margin-left: 8px; vertical-align: middle;
+}
+
+/* steps */
+.steps { display: flex; flex-direction: column; gap: 20px; }
+
+.step {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.step-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--border);
+}
+.step-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; flex-shrink: 0;
+}
+.step-title { font-size: 14.5px; font-weight: 500; }
+.step-sub { font-size: 12px; color: var(--text-muted); }
+.step-body { padding: 16px 20px; }
+
+p { margin-bottom: 10px; }
+p:last-child { margin-bottom: 0; }
+strong { font-weight: 500; }
+
+ul, ol { padding-left: 18px; margin-bottom: 10px; }
+ul:last-child, ol:last-child { margin-bottom: 0; }
+li { margin-bottom: 5px; font-size: 13.5px; }
+li:last-child { margin-bottom: 0; }
+
+.callout {
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+.callout.tip { background: var(--accent-light); color: var(--accent-text); border: 0.5px solid oklch(82% 0.1 248); }
+.callout.warn { background: var(--warning-light); color: var(--warning-text); border: 0.5px solid oklch(82% 0.12 75); }
+.callout.danger { background: var(--danger-light); color: var(--danger); border: 0.5px solid oklch(82% 0.1 20); }
+
+code {
+  font-family: "SF Mono", Consolas, "Courier New", monospace;
+  font-size: 12px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+pre {
+  background: oklch(16% 0.01 250);
+  color: oklch(88% 0.01 250);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  font-size: 12px;
+  font-family: "SF Mono", Consolas, "Courier New", monospace;
+  line-height: 1.65;
+  overflow-x: auto;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+pre .c { color: oklch(65% 0.05 250); }
+pre .s { color: oklch(75% 0.14 158); }
+pre .k { color: oklch(70% 0.16 248); }
+
+.img-placeholder {
+  background: var(--surface2);
+  border: 0.5px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  text-align: center;
+  color: var(--text-hint);
+  font-size: 12.5px;
+  margin-top: 10px;
+}
+
+.divider { height: 0.5px; background: var(--border); margin: 28px 0; }
+
+.section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--text-hint); text-transform: uppercase; margin-bottom: 12px;
+}
+
+.cost-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+.cost-table th, .cost-table td { padding: 8px 12px; text-align: left; border-bottom: 0.5px solid var(--border); }
+.cost-table th { font-weight: 500; color: var(--text-muted); font-size: 12px; background: var(--surface2); }
+.cost-table tr:last-child td { border-bottom: none; }
+
+.final-card {
+  background: var(--accent-light);
+  border: 0.5px solid oklch(82% 0.1 248);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-top: 28px;
+}
+.final-card h3 { font-size: 14px; font-weight: 500; color: var(--accent-text); margin-bottom: 8px; }
+.final-card p { font-size: 13px; color: var(--accent-text); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>部署指南 <span class="badge">免费方案</span></h1>
+    <p>使用 Cloudflare Worker + Pages，将访谈应用发布为公网链接，对外分发无需任何服务器。</p>
+  </div>
+
+  <div class="section-label">部署架构</div>
+  <div class="step" style="margin-bottom:20px;">
+    <div class="step-body">
+      <p style="font-size:13px; color:var(--text-muted);">
+        <strong style="color:var(--text);">用户浏览器</strong>
+        → 访问 <code>interview.pages.dev</code>（Cloudflare Pages 托管 HTML）
+        → 调用 <code>proxy.workers.dev</code>（Cloudflare Worker，携带 API Key）
+        → 转发到 <strong style="color:var(--text);">DeepSeek API</strong>
+      </p>
+      <div class="callout tip">API Key 只存在 Worker 的环境变量中，前端源码里看不到，可以安全分发链接。</div>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">注册 Cloudflare 账号</div>
+          <div class="step-sub">已有账号可跳过</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <ol>
+          <li>访问 <code>dash.cloudflare.com</code>，点击 <strong>Sign Up</strong></li>
+          <li>填写邮箱和密码完成注册，<strong>不需要绑卡、不需要域名</strong></li>
+          <li>验证邮箱后登录控制台</li>
+        </ol>
+        <div class="callout tip">免费套餐每天有 100,000 次 Worker 请求额度，日均几十次访谈完全够用。</div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">创建并部署 Worker（API 代理）</div>
+          <div class="step-sub">把 API Key 存在服务端</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <ol>
+          <li>在控制台左侧菜单点 <strong>Workers &amp; Pages</strong> → <strong>Create</strong></li>
+          <li>选 <strong>Create Worker</strong>，名称填 <code>interview-proxy</code>，点 <strong>Deploy</strong></li>
+          <li>部署成功后点 <strong>Edit Code</strong>，删除默认内容，把 <code>worker.js</code> 文件中的全部内容粘贴进去，点右上角 <strong>Deploy</strong></li>
+        </ol>
+        <p style="margin-top:14px;"><strong>配置环境变量（存 API Key）：</strong></p>
+        <ol>
+          <li>回到 Worker 详情页，点 <strong>Settings</strong> → <strong>Variables and Secrets</strong></li>
+          <li>点 <strong>Add variable</strong>，名称填 <code>DEEPSEEK_API_KEY</code>，值填你的 DeepSeek Key（<code>sk-xxx</code>），类型选 <strong>Secret</strong></li>
+          <li>点 <strong>Save and deploy</strong></li>
+        </ol>
+        <p style="margin-top:12px;">此时 Worker 地址类似：</p>
+        <pre>https://interview-proxy.<span class="s">你的用户名</span>.workers.dev</pre>
+        <div class="callout warn">先复制这个地址，下一步要填进 HTML 文件里。</div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">修改 interview_app.html，填入 Worker 地址</div>
+          <div class="step-sub">让前端知道去哪里发请求</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>用文本编辑器（记事本或 VS Code）打开 <code>interview_app.html</code>，找到文件顶部 JS 的这一行：</p>
+        <pre><span class="k">const</span> PROXY_URL = <span class="s">''</span>;</pre>
+        <p>改为你的 Worker 地址：</p>
+        <pre><span class="k">const</span> PROXY_URL = <span class="s">'https://interview-proxy.你的用户名.workers.dev'</span>;</pre>
+        <p>保存文件。</p>
+        <div class="callout tip">填入 PROXY_URL 后，页面上的「API Key 输入框」会自动隐藏，用户打开链接直接填被访谈人信息就能用。</div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">上传 HTML 到 Cloudflare Pages</div>
+          <div class="step-sub">生成公网链接</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <ol>
+          <li>在控制台 <strong>Workers &amp; Pages</strong> → <strong>Create</strong> → 选 <strong>Pages</strong> → <strong>Upload assets</strong></li>
+          <li>项目名称填 <code>interview-app</code>（或任意名称），点 <strong>Create project</strong></li>
+          <li>把修改好的 <code>interview_app.html</code> <strong>重命名为 <code>index.html</code></strong>，然后拖入上传区域</li>
+          <li>点 <strong>Deploy site</strong>，等几秒完成</li>
+        </ol>
+        <p style="margin-top:12px;">部署成功后，你会得到一个类似这样的链接：</p>
+        <pre>https://interview-app.<span class="s">pages.dev</span></pre>
+        <p>把这个链接发给同事，打开即用，无需安装任何东西。</p>
+        <div class="callout tip">
+          以后更新 HTML 内容：回到 Pages 项目 → <strong>Deployments</strong> → 上传新文件即可，链接不变。
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">5</div>
+        <div>
+          <div class="step-title">解决跨域问题（如遇到）</div>
+          <div class="step-sub">通常不需要，仅在请求被拦截时操作</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p>Worker 代码已内置 CORS 允许所有来源（<code>*</code>）。如果你希望只允许自己的 Pages 域名访问，在 Worker 环境变量中额外添加：</p>
+        <pre>ALLOWED_ORIGIN = https://interview-app.pages.dev</pre>
+        <p>不配置则默认允许任何域名（对内部工具来说没有安全问题）。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">费用参考</div>
+  <table class="cost-table">
+    <thead>
+      <tr><th>项目</th><th>免费额度</th><th>超出后</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Cloudflare Worker</td><td>每天 10 万次请求</td><td>$5/月 可购买更多</td></tr>
+      <tr><td>Cloudflare Pages</td><td>每月 50 万次访问、500 次部署</td><td>基本用不完</td></tr>
+      <tr><td>DeepSeek API</td><td>—</td><td>约 ¥0.03–0.08 / 次完整访谈</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:10px; font-size:12.5px; color:var(--text-muted);">每月 100 次访谈的 API 成本约 ¥3–8 元。</p>
+
+  <div class="final-card">
+    <h3>完成后的使用流程</h3>
+    <p>同事收到链接 → 浏览器打开 → 填写被访谈人姓名、岗位、访谈主题 → 点「开始访谈」→ AI 全程主导对话 → 点「生成报告」→ 复制结构化报告粘贴归档。</p>
+  </div>
+
+</div>
+</body>
+</html>

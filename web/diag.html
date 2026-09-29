@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>语音诊断</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:#0f1115;color:#e8eaf0;padding:14px}
+  h1{font-size:17px;margin-bottom:4px}
+  .sub{font-size:12px;color:#8b93a7;margin-bottom:12px}
+  button{width:100%;padding:15px;font-size:17px;font-weight:600;color:#fff;
+         background:#EA5504;border:0;border-radius:10px;margin-bottom:12px}
+  button:disabled{background:#5a4a42;color:#bbb}
+  .row{background:#191d26;border-radius:9px;padding:10px 12px;margin-bottom:8px}
+  .k{font-size:11px;color:#8b93a7;letter-spacing:.4px}
+  .v{font-size:14px;word-break:break-all;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .ok{color:#3ddc84}.warn{color:#ffb020}.bad{color:#ff5c5c}.dim{color:#8b93a7}
+  .big{font-size:16px;font-weight:700}
+  #verdict{background:#221a12;border:1px solid #EA5504;border-radius:10px;padding:12px;margin:10px 0 14px}
+</style>
+</head>
+<body>
+<h1>语音功能诊断</h1>
+<div class="sub">打开本页 → 点下面按钮 → 把整屏截图发回（不用点录音）</div>
+
+<div id="fileWarn" style="display:none;background:#3a1212;border:1px solid #ff5c5c;border-radius:10px;padding:12px;margin-bottom:12px">
+  <div class="k" style="color:#ff5c5c">⚠️ 当前打开方式无效</div>
+  <div class="v" style="margin-top:6px">你是在 <b>App 内置文件预览</b>（file:// 本地文件）里打开的本页。
+这种环境被手机安全策略<b>禁止一切网络请求</b>，测试必然全部失败，结果无效。
+
+请<b>复制下面这行网址</b> → 打开手机浏览器（Edge / Chrome）→ 粘贴到<b>地址栏</b>访问：
+  <div class="v ok" style="margin-top:8px;user-select:all">work-d1gs0jzrg2277d75e-1391683363.tcloudbaseapp.com/diag.html</div>
+  </div>
+</div>
+
+<div id="verdict" class="row">
+  <div class="k">结论</div>
+  <div class="v big" id="verdictText">尚未开始</div>
+</div>
+
+<button id="run">开始诊断（网络请求测试）</button>
+<button id="runMic" style="background:#2563eb">真实录音测试（需授权麦克风，2秒）</button>
+<div id="out"></div>
+
+<script>
+const API_BASE = 'https://work-d1gs0jzrg2277d75e-1391683363.ap-shanghai.app.tcloudbase.com/api';
+const out = document.getElementById('out');
+const verdict = document.getElementById('verdictText');
+
+/* ★ file:// 检测：App 内置文件预览环境禁止 fetch，直接提示换浏览器打开 */
+if (location.protocol === 'file:') {
+  document.getElementById('fileWarn').style.display = 'block';
+}
+
+function row(k, v, cls) {
+  const d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = '<div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + String(v).replace(/[<>&]/g, function (c) {
+    return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+  }) + '</div>';
+  out.appendChild(d);
+  return d;
+}
+
+/* 单次 fetch 尝试，返回 {ok,status,ms,name,message,cause} */
+async function tryFetch(label, url, bodyStr, withSignal) {
+  const t = Date.now();
+  let ctl = null;
+  try {
+    if (withSignal && typeof AbortController !== 'undefined') ctl = new AbortController();
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: bodyStr,
+      signal: ctl ? ctl.signal : undefined,
+    });
+    const txt = await r.text();
+    const res = { ok: true, status: r.status, ms: Date.now() - t, text: txt.slice(0, 160) };
+    row(label, 'HTTP ' + res.status + ' · ' + res.ms + 'ms\n' + res.text, r.status === 200 ? 'ok' : 'warn');
+    return res;
+  } catch (e) {
+    const res = {
+      ok: false, ms: Date.now() - t,
+      name: e.name, message: e.message,
+      cause: e.cause ? (e.cause.code || e.cause.message || String(e.cause)) : '',
+    };
+    row(label, '❌ ' + res.name + ' · ' + res.ms + 'ms\nmessage: ' + res.message + (res.cause ? '\ncause: ' + res.cause : ''), 'bad');
+    return res;
+  }
+}
+
+function b64(n) {           // 造 n 字节的假音频 base64
+  const CH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let s = '';
+  for (let i = 0; i < n; i++) s += CH[i & 63];
+  return s;
+}
+
+document.getElementById('run').addEventListener('click', async function () {
+  const btn = this;
+  if (location.protocol === 'file:') {
+    verdict.textContent = '无效环境：file:// 禁止网络请求，请按上方红色提示换浏览器打开';
+    verdict.className = 'v big bad';
+    return;
+  }
+  btn.disabled = true;
+  out.innerHTML = '';
+  verdict.textContent = '运行中…';
+  verdict.className = 'v big warn';
+
+  /* 0. 环境信息（最关键：确认页面到底跑在哪个域） */
+  row('① 页面地址 (location.origin)', location.origin, '');
+  row('② 页面完整 URL', location.href.slice(0, 200), 'dim');
+  row('③ 浏览器 UA', navigator.userAgent.slice(0, 220), 'dim');
+  row('④ 是否支持 AbortController', String(typeof AbortController !== 'undefined'), '');
+
+  /* 1. 小请求（1KB）—— 对照基准 */
+  const small = await tryFetch('⑤ 小请求 1KB（对照基准）', API_BASE + '/asr',
+    JSON.stringify({ audio_base64: b64(1024), format: 'wav' }), false);
+
+  /* 2. 大请求（153KB）—— 复现用户场景 */
+  const big = await tryFetch('⑥ 大请求 153KB（复现现场）', API_BASE + '/asr',
+    JSON.stringify({ audio_base64: b64(153 * 1024), format: 'wav', duration_ms: 4000, sample_rate: 16000 }), false);
+
+  /* 3. 大请求 + signal（与线上代码完全一致） */
+  const bigSig = await tryFetch('⑦ 大请求 153KB + signal', API_BASE + '/asr',
+    JSON.stringify({ audio_base64: b64(153 * 1024), format: 'wav', duration_ms: 4000, sample_rate: 16000 }), true);
+
+  /* 4. 大请求到 chat（换路径，验证是否路径相关） */
+  const bigChat = await tryFetch('⑧ 大请求 153KB → /chat', API_BASE + '/chat',
+    JSON.stringify({ messages: [{ role: 'user', content: 'x'.repeat(153 * 1024) }] }), false);
+
+  /* 5. 中等体积梯度，找崩溃点 */
+  for (const kb of [16, 48, 96]) {
+    await tryFetch('⑨ ' + kb + 'KB', API_BASE + '/asr',
+      JSON.stringify({ audio_base64: b64(kb * 1024), format: 'wav' }), false);
+  }
+
+  /* 结论 */
+  let v = '';
+  if (small.ok && !big.ok) {
+    v = '★ 小请求能通、大请求失败 → 是「体积/中间链路」问题';
+  } else if (!small.ok && !big.ok) {
+    v = '★ 连 1KB 都失败 → 是「域名/网络/证书」问题，与体积无关';
+  } else if (small.ok && big.ok) {
+    v = '★ 两者都通 → 本机网络正常！问题在录音本身或特定时机（请留意⑤⑥的 ms 差异）';
+  } else {
+    v = '★ 结果异常，请看上面明细';
+  }
+  if (!bigSig.ok && big.ok) v += '；另：加 signal 后才失败 → AbortController 相关';
+  verdict.textContent = v;
+  verdict.className = 'v big ok';
+  btn.disabled = false;
+});
+
+/* ── 真实录音测试：2 秒 → 重采样 16k → WAV → base64 → 上传，完整链路 ── */
+document.getElementById('runMic').addEventListener('click', async function () {
+  const btn = this;
+  if (location.protocol === 'file:') {
+    verdict.textContent = '无效环境：file:// 禁止网络请求与麦克风，请按上方红色提示换浏览器打开';
+    verdict.className = 'v big bad';
+    return;
+  }
+  btn.disabled = true;
+  verdict.textContent = '录音测试运行中…';
+  verdict.className = 'v big warn';
+  row('录音测试', '请求麦克风授权…', 'dim');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    row('授权', '成功', 'ok');
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    row('AudioContext.sampleRate', String(ctx.sampleRate), '');
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    const chunks = [];
+    node.onaudioprocess = function (e) { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    node.connect(ctx.destination);
+    const src = ctx.createMediaStreamSource(stream);
+    src.connect(node);
+    row('录音', '录音中… 2 秒后自动停止', 'dim');
+    await new Promise(function (r) { setTimeout(r, 2000); });
+    src.disconnect(); node.disconnect();
+    stream.getTracks().forEach(function (t) { t.stop(); });
+    const inRate = ctx.sampleRate;
+    let total = 0; for (let i = 0; i < chunks.length; i++) total += chunks[i].length;
+    row('采集', chunks.length + ' 块 / ' + total + ' 采样点 / inRate=' + inRate, '');
+    await ctx.close();
+
+    /* 重采样到 16k */
+    let out;
+    if (inRate === 16000 || !isFinite(inRate) || inRate < 4000 || inRate > 384000) {
+      out = new Float32Array(total);
+      let p = 0; for (let i = 0; i < chunks.length; i++) { out.set(chunks[i], p); p += chunks[i].length; }
+    } else {
+      const outLen = Math.floor(total * 16000 / inRate);
+      out = new Float32Array(outLen);
+      const merged = new Float32Array(total);
+      let p = 0; for (let i = 0; i < chunks.length; i++) { merged.set(chunks[i], p); p += chunks[i].length; }
+      for (let i = 0; i < outLen; i++) {
+        const t = i * (inRate / 16000);
+        const i0 = Math.floor(t); const frac = t - i0;
+        const a = merged[Math.min(i0, total - 1)];
+        const b = merged[Math.min(i0 + 1, total - 1)];
+        out[i] = a + (b - a) * frac;
+      }
+    }
+    row('重采样', out.length + ' 采样点 @16kHz', '');
+
+    /* WAV + base64 */
+    const bytes = new Uint8Array(44 + out.length * 2);
+    const dv = new DataView(bytes.buffer);
+    const ws = function (o, s) { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, 'RIFF'); dv.setUint32(4, 36 + out.length * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, 16000, true); dv.setUint32(28, 32000, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    ws(36, 'data'); dv.setUint32(40, out.length * 2, true);
+    for (let i = 0; i < out.length; i++) {
+      const s = Math.max(-1, Math.min(1, out[i]));
+      dv.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    const TAB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let b64 = '';
+    for (let i = 0; i < bytes.length; i += 3) {
+      const b0 = bytes[i], b1 = i + 1 < bytes.length ? bytes[i + 1] : 0, b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+      b64 += TAB[b0 >> 2] + TAB[((b0 & 3) << 4) | (b1 >> 4)];
+      b64 += i + 1 < bytes.length ? TAB[((b1 & 15) << 2) | (b2 >> 6)] : '=';
+      b64 += i + 2 < bytes.length ? TAB[b2 & 63] : '=';
+    }
+    row('WAV+base64', bytes.length + ' 字节音频 → base64 ' + (b64.length / 1024).toFixed(0) + 'KB', '');
+
+    /* 上传（与正式代码一致，含 signal） */
+    const t = Date.now();
+    try {
+      const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const timer = setTimeout(function () { if (ctl) ctl.abort(); }, 45000);
+      const r = await fetch(API_BASE + '/asr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio_base64: b64, format: 'wav', duration_ms: 2000, sample_rate: 16000 }),
+        signal: ctl ? ctl.signal : undefined,
+      });
+      clearTimeout(timer);
+      const txt = await r.text();
+      row('上传', 'HTTP ' + r.status + ' · ' + (Date.now() - t) + 'ms\n' + txt.slice(0, 300), r.status === 200 ? 'ok' : 'warn');
+      verdict.textContent = '录音测试完成，看上面「上传」行';
+      verdict.className = 'v big ok';
+    } catch (e) {
+      row('上传', '❌ ' + e.name + ' · ' + (Date.now() - t) + 'ms\nmessage: ' + e.message + (e.cause ? '\ncause: ' + (e.cause.code || e.cause.message || String(e.cause)) : ''), 'bad');
+      verdict.textContent = '★ 复现了！真实录音上传也失败。把本页整屏截图发回';
+      verdict.className = 'v big bad';
+    }
+  } catch (e) {
+    row('录音测试', '❌ ' + e.name + ': ' + e.message, 'bad');
+    verdict.textContent = '录音授权或采集阶段失败（未到上传步）';
+    verdict.className = 'v big bad';
+  }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# 统一按 LF 存储（Windows 上工作区仍可保持 CRLF）
+* text=auto eol=lf
+
+# 二进制文件不做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
