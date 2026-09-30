@@ -17,10 +17,20 @@ import os
 import subprocess
 import sys
 
+try:
+    import segno            # 二维码（纯 Python，可输出矢量 SVG）
+except ImportError:         # 缺库时只留文字，不阻断整张图
+    segno = None
+
 D = os.path.dirname(os.path.abspath(__file__))
 OUT_HTML = os.path.join(D, 'out', 'usage-card.html')
 OUT_PNG = os.path.join(D, 'out', 'usage-card.png')
 WIDTH = 1080
+
+# ── 两个入口的地址（二维码指向这里）─────────────────────────
+# 与既有的「访谈工具入口-二维码卡」用同一个域，避免同事手上两个链接不一致。
+QR_ADVISOR_URL = 'https://interview-work-d1gs0jzrg2277d75e.webapps.tcloudbase.com/'
+QR_ADMIN_URL = 'https://interview-work-d1gs0jzrg2277d75e.webapps.tcloudbase.com/admin.html'
 
 # ─────────────────────────────────────────────────────────────
 # 文案区（改文案只动这一段，别再碰 CSS）
@@ -74,6 +84,39 @@ FIRST_TIME = [
     '第一次不熟很正常，聊到六个格子都亮了就算完成',
 ]
 
+# 两个入口卡片。
+# 「需口令」是真的：管理页有登录口令，但**不印在图上**——图会转发、会打印张贴，
+# 口令必须和图片分开走（谁需要谁单独给）。
+QR_CARDS = [
+    {
+        'tag': '咨询顾问',
+        'name': '访谈入口',
+        'desc': '填 4 项 → 跟 AI 聊 →<br>生成报告并提交',
+        'url': QR_ADVISOR_URL,
+        'show': 'interview-work-d1gs0jzrg2277d75e<wbr>.webapps<wbr>.tcloudbase<wbr>.com',
+    },
+    {
+        'tag': '运营岗',
+        'name': '管理入口',
+        'desc': '查看报告 · 审核状态 ·<br>补发邮件（需口令）',
+        'url': QR_ADMIN_URL,
+        'show': 'interview-work-d1gs0jzrg2277d75e<wbr>.webapps<wbr>.tcloudbase<wbr>.com<wbr>/admin.html',
+    },
+]
+
+
+def qr_data_uri(url):
+    """二维码 → SVG data URI。
+
+    用 SVG 而非位图：二维码是纯色块图形，矢量在打印和缩放时都不会糊。
+    纠错级别取 H（约 30% 容错），打印折痕、屏幕反光、截图压缩后仍可识别。
+    缺 segno 时返回空串 —— 卡片照常渲染，只是没有码，不阻断整张图。
+    """
+    if segno is None:
+        return ''
+    qr = segno.make(url, error='h')
+    return qr.svg_data_uri(scale=10, dark='#1A1D24', light='#FFFFFF', border=0)
+
 
 def build_html():
     def li_steps(items):
@@ -107,6 +150,18 @@ def build_html():
           <div class="flow-title">{title}</div>
           <div class="flow-desc">{desc}</div>
         </div>
+      </div>''')
+        return '\n'.join(out)
+
+    def li_qr_cards(items):
+        out = []
+        for i, it in enumerate(items):
+            out.append(f'''      <div class="qr-card">
+        <div class="qr-tag{' alt' if i else ''}">{it['tag']}</div>
+        <div class="qr-img"><img src="{qr_data_uri(it['url'])}" alt="{it['name']}二维码"></div>
+        <div class="qr-name">{it['name']}</div>
+        <div class="qr-desc">{it['desc']}</div>
+        <div class="qr-url">{it['show']}</div>
       </div>''')
         return '\n'.join(out)
 
@@ -332,6 +387,41 @@ body {{
   flex: none; text-align: right;
   font-size: 20px; color: var(--ink-3); line-height: 1.6;
 }}
+/* ── 两个入口二维码 ── */
+.qr-row {{ display: flex; gap: 26px; }}
+.qr-card {{
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 26px 22px 24px;
+  text-align: center;
+}}
+.qr-tag {{
+  display: inline-block;
+  font-size: 19px; font-weight: 700; letter-spacing: 1px;
+  color: #fff; background: var(--orange);
+  padding: 5px 18px; border-radius: 999px;
+  margin-bottom: 18px;
+}}
+.qr-tag.alt {{ background: var(--ink); }}
+.qr-img {{ display: flex; justify-content: center; }}
+.qr-img img {{ width: 282px; height: 282px; display: block; }}
+.qr-name {{ margin-top: 18px; font-size: 28px; font-weight: 800; }}
+.qr-desc {{ margin-top: 9px; font-size: 20px; line-height: 1.55; color: var(--ink-3); }}
+.qr-url {{
+  margin-top: 14px; font-size: 15px; line-height: 1.5;
+  color: #A6ADB8;   /* 断行交给 URL 里的 <wbr>，落在「.」前，别让 break-all 把单词撕开 */
+}}
+.qr-tip {{
+  margin-top: 22px;
+  background: var(--orange-lt);
+  border-radius: 16px;
+  padding: 20px 24px;
+  font-size: 21px; line-height: 1.66;
+  color: var(--ink-2);
+}}
+.qr-tip b {{ color: var(--orange-dp); }}
 </style>
 </head>
 <body>
@@ -423,6 +513,26 @@ body {{
 {li_two_col(OPS_TIPS)}
     </div>
 
+    <!-- ⑥ 两个入口二维码 -->
+    <div class="band">
+      <div class="band-idx">陆</div>
+      <div class="band-txt">
+        <div class="band-t">两个入口，各扫各的</div>
+        <div class="band-s">顾问进访谈页，运营岗进管理页。微信里直接点链接会打不开，请用手机自带「相机」扫。</div>
+      </div>
+      <div class="band-rule"></div>
+    </div>
+
+    <div class="block">
+      <div class="qr-row">
+{li_qr_cards(QR_CARDS)}
+      </div>
+      <div class="qr-tip">
+        <b>别用微信「扫一扫」。</b>用手机自带「相机」对准二维码 → 点屏幕上方的链接横幅 → 选「用浏览器打开」。
+        第一次扫码会看到一次风险提醒页，点「确定访问」，以后不再出现。
+      </div>
+    </div>
+
     <div class="note">
       <b>第一次用，记不住上面这些也没关系。</b>打开链接照着填、照着聊就行，
       工具会在过程中自己提醒你什么时候可以生成报告。
@@ -464,7 +574,7 @@ $src = "{OUT_HTML.replace('/', '\\')}"
 Start-Process -FilePath msedge -ArgumentList @(
   '--headless', '--disable-gpu', '--no-first-run', '--hide-scrollbars',
   '--force-device-scale-factor=2',
-  '--window-size={WIDTH},4000',
+  '--window-size={WIDTH},5600',
   "--user-data-dir=$ud",
   "--screenshot=$out",
   "file:///$src"
