@@ -114,6 +114,48 @@ button, input, select, textarea { font-family: inherit; }
 .field.grow { flex: 1; min-width: 200px; }
 .field.grow input { width: 100%; }
 
+/* ── AI 主题/标签搜索框 ──────────────────────────────────────
+   与「关键词」的区别：关键词搜的是原始录入字段（主题原文/姓名/UM），
+   这里搜的是 AI 提炼出来的 ai_topic 与 tags。语义不同，所以分开两个框，
+   用户不会误以为「搜不到就是没有」。 */
+.field.search-field { min-width: 260px; }
+.lbl-tag {
+  display: inline-block; margin-left: 4px; padding: 0 5px;
+  font-size: 10px; line-height: 14px; border-radius: 4px;
+  background: var(--accent); color: #fff; vertical-align: 1px;
+}
+.search-box { position: relative; display: flex; align-items: center; }
+.search-icon {
+  position: absolute; left: 9px; width: 14px; height: 14px;
+  fill: none; stroke: var(--text-hint); stroke-width: 2;
+  stroke-linecap: round; pointer-events: none;
+}
+.search-box input {
+  width: 100%; padding-left: 29px; padding-right: 28px;
+}
+.search-clear {
+  position: absolute; right: 6px; width: 18px; height: 18px;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: var(--surface3); color: var(--text-muted);
+  font-size: 10px; line-height: 18px; padding: 0;
+}
+.search-clear:hover { background: var(--border-strong); color: var(--text); }
+.search-hint { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+.search-hint.warn { color: var(--warning-text); }
+/* 结果里标出「为什么命中」：是标签命中还是 AI 主题命中 */
+.hit-on {
+  background: #FFE9A8; border-radius: 3px; padding: 0 2px;
+  color: var(--text); font-weight: 500;
+}
+.hit-badge {
+  display: inline-block; margin-left: 6px; padding: 0 6px;
+  font-size: 10.5px; line-height: 15px; border-radius: 4px;
+  background: var(--accent); color: #fff; vertical-align: 1px; white-space: nowrap;
+}
+.hit-badge.tag { background: var(--success); }
+.hit-tags { margin-top: 4px; }
+.hit-tags .tag-chip { font-size: 11px; padding: 1px 7px; margin: 0 4px 4px 0; }
+
 .stats { font-size: 12.5px; color: var(--text-muted); margin-bottom: 10px; }
 
 table { width: 100%; border-collapse: collapse; background: var(--surface); }
@@ -406,6 +448,16 @@ td.topic .ell {
         <label>关键词（主题 / 被访谈人 / UM 号 / 后线对接人）</label>
         <input type="text" id="f-q" placeholder="输入后回车查询" onkeydown="if(event.key==='Enter')loadList()">
       </div>
+      <div class="field grow search-field">
+        <label>搜索 AI 主题与标签 <span class="lbl-tag">AI</span></label>
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+          <input type="text" id="f-ai" placeholder="如：老客户转介绍 / 棱镜 / 长期关系保温" autocomplete="off"
+            onkeydown="if(event.key==='Enter')loadList()" oninput="onAiInput()">
+          <button class="search-clear" id="f-ai-clear" onclick="clearAiSearch()" title="清空" hidden>✕</button>
+        </div>
+        <div class="search-hint" id="f-ai-hint">在 AI 归纳主题 + 自动标签里找。多个词用空格隔开，表示要同时满足</div>
+      </div>
       <div class="field">
         <label>城市</label>
         <select id="f-city">
@@ -512,7 +564,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.09.29-e';
+const ADMIN_BUILD = 'v2026.09.30-a';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
@@ -725,7 +777,93 @@ function resetFilters() {
   document.getElementById('f-city').value = '';
   document.getElementById('f-from').value = '';
   document.getElementById('f-to').value = '';
+  clearAiSearch(false);
   loadList();
+}
+
+/* ── AI 主题 / 标签搜索 ────────────────────────────────────────
+   为什么要本地过滤：PostgREST 不支持对 text[] 列做 ilike
+   （官方 issue #3920 仍在讨论，明确说没有内置运算符）。
+   所以分两步：
+     ① 服务端按「标签精确命中」拉候选 —— tags=cs.{维度:取值}
+        数组包含查询走 GIN 索引（迁移 20260929100000），一次查询即命中；
+     ② 前端再对拿回来的行做子串过滤 —— 覆盖「只记得半截词」的场景，
+        ai_topic 与 tags 都参与，并标出到底命中在哪一项。
+   只靠 ① 会漏（要求输入完整标签值）；只靠 ② 会漏（候选集被分页截断）。
+   两路合并后对当前页是准确的。 */
+let aiHits = Object.create(null);   // id → { tags:[], topics:[] }，用于结果标记
+
+function onAiInput() {
+  const v = document.getElementById('f-ai').value.trim();
+  document.getElementById('f-ai-clear').hidden = !v;
+  const hint = document.getElementById('f-ai-hint');
+  if (!v) {
+    hint.textContent = '在 AI 归纳主题 + 自动标签里找。多个词用空格隔开，表示要同时满足';
+    hint.className = 'search-hint';
+  } else {
+    const n = aiTerms(v).length;
+    hint.textContent = n > 1
+      ? '回车搜索 · 当前 ' + n + ' 个词，需同时满足；可填标签全称（获客方式:老客户转介绍）或其中半截（老客户）'
+      : '回车搜索 · 可填标签全称（获客方式:老客户转介绍）或其中半截（老客户）';
+    hint.className = 'search-hint';
+  }
+}
+
+function clearAiSearch(reload) {
+  const el = document.getElementById('f-ai');
+  if (el) el.value = '';
+  const c = document.getElementById('f-ai-clear');
+  if (c) c.hidden = true;
+  onAiInput();
+  if (reload !== false) loadList();
+}
+
+/* 把用户输入拆成待匹配的片段：空格分隔，容忍中英文冒号 */
+function aiTerms(raw) {
+  return String(raw || '')
+    .split(/\s+/)
+    .map(s => s.replace(/[：]/g, ':').trim())
+    .filter(Boolean);
+}
+
+/* 一个片段是否命中某条记录；同时记录命中位置，供结果标记
+   ── 多词是「同时满足」(AND)，不是「任一满足」(OR) ──
+   搜「棱镜 老客户」要的是「既是棱镜产品、又是老客户转介绍」的案例。
+   若按 OR 合并，实测会把「老关系激活」「孤儿单盘活」等只要沾一个词的
+   案例全都捞进来，结果比单词搜索还多 —— 那样的多词搜索没有意义。
+   每个词可以落在标签上、也可以落在 AI 主题上，但必须「每词都有落点」。 */
+function matchAiNote(row, terms) {
+  if (!terms.length) return null;
+  const tags = Array.isArray(row.tags) ? row.tags : [];
+  const topics = row.ai_topic ? [row.ai_topic] : [];
+  const hitTags = [];
+  const hitTopics = [];
+
+  for (const t of terms) {
+    const lower = t.toLowerCase();
+    // 标签：支持「维度:取值」整体匹配，也支持只写取值半截
+    const tagHit = tags.filter(x => x.toLowerCase().indexOf(lower) >= 0);
+    // AI 主题：子串
+    const topicHit = topics.some(x => x.toLowerCase().indexOf(lower) >= 0);
+
+    // ★ 这个词在任何一处都没落点 → 整条不匹配（AND 语义的落点）
+    if (!tagHit.length && !topicHit) return null;
+
+    if (tagHit.length) hitTags.push(...tagHit);
+    if (topicHit) hitTopics.push(row.ai_topic);
+  }
+  return { tags: [...new Set(hitTags)], topics: [...new Set(hitTopics)] };
+}
+
+/* 把命中片段高亮（先转义再替换，避免 XSS） */
+function markHit(text, terms) {
+  let out = esc(text);
+  for (const t of terms) {
+    if (!t) continue;
+    const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    out = out.replace(re, '<span class="hit-on">$1</span>');
+  }
+  return out;
 }
 
 async function loadList() {
@@ -734,6 +872,9 @@ async function loadList() {
   rowsEl.innerHTML = '';
   emptyEl.style.display = 'none';
   document.getElementById('stats').textContent = '加载中…';
+
+  const aiRaw = document.getElementById('f-ai').value.trim();
+  const terms = aiTerms(aiRaw);
 
   const payload = {
     action: 'list',
@@ -747,13 +888,54 @@ async function loadList() {
   if (from) payload.from = from + 'T00:00:00+08:00';
   if (to) payload.to = to + 'T23:59:59+08:00';
 
+  /* 标签精确命中：只有形如「维度:取值」的片段才走服务端 cs 查询，
+     其余（半截词、AI 主题片段）留给前端过滤，避免拿不到任何候选。 */
+  if (terms.length) {
+    const exactTags = terms.filter(t => t.indexOf(':') > 0);
+    if (exactTags.length) payload.tags = exactTags.slice(0, 8);
+  }
+
   try {
     const data = await api(payload);
-    currentRows = data.rows || [];
+    let rows = data.rows || [];
+
+    /* 前端二次过滤：服务端只负责「标签精确命中」，
+       其余情况（半截词/主题片段）在这里兜住 */
+    aiHits = Object.create(null);
+    if (terms.length) {
+      const narrowed = [];
+      for (const r of rows) {
+        const note = matchAiNote(r, terms);
+        if (note) { aiHits[r.id] = note; narrowed.push(r); }
+      }
+      /* 若服务端已按精确标签筛过，这里只做补充收窄；
+         若没筛（全是半截词），这里就是唯一的过滤入口 */
+      rows = narrowed;
+
+      if (!rows.length) {
+        document.getElementById('stats').textContent =
+          'AI 主题/标签里没有匹配「' + aiRaw + '」的记录';
+      }
+    }
+
+    currentRows = rows;
     renderRows(currentRows);
-    document.getElementById('stats').textContent =
-      '共 ' + (data.total != null ? data.total : currentRows.length) + ' 条记录' +
-      (currentRows.length < (data.total || 0) ? '（当前展示前 ' + currentRows.length + ' 条）' : '');
+
+    const total = data.total != null ? data.total : currentRows.length;
+    const tagFiltered = payload.tags && payload.tags.length;
+    let stats;
+    if (!terms.length) {
+      stats = '共 ' + total + ' 条记录' +
+        (currentRows.length < total ? '（当前展示前 ' + currentRows.length + ' 条）' : '');
+    } else if (!rows.length) {
+      /* 搜不到时明确说「在哪搜的、搜的什么」，不然用户分不清
+         「没有这条」和「这功能坏了」 */
+      stats = 'AI 主题/标签里没有匹配「' + aiRaw + '」的记录';
+    } else {
+      stats = '共 ' + currentRows.length + ' 条记录' +
+        (tagFiltered ? '（已按标签精确筛 ' + payload.tags.join('、') + '）' : '');
+    }
+    document.getElementById('stats').textContent = stats;
   } catch (e) {
     document.getElementById('stats').textContent = '加载失败：' + e.message;
   }
@@ -773,6 +955,8 @@ function renderRows(rows) {
   const emptyEl = document.getElementById('empty');
   if (!rows.length) { emptyEl.style.display = 'block'; return; }
 
+  const terms = aiTerms(document.getElementById('f-ai').value);
+
   rowsEl.innerHTML = rows.map(r => {
     const cls = STATUS_CLASS[r.status] || 'wait';
     const owner = r.backend_owner_name
@@ -782,15 +966,26 @@ function renderRows(rows) {
     const mailCell = mailed
       ? `<span class="pill ok">已发送</span><br><span style="font-size:11.5px;color:var(--text-hint)">${fmtTime(r.mail_sent_at)}</span>`
       : '<span class="pill wait">未发送</span>';
+
+    /* 搜索命中标记：让用户一眼看到「为什么这条在结果里」 */
+    const note = aiHits[r.id];
+    const topicBadge = note && note.topics.length
+      ? '<span class="hit-badge">主题命中</span>' : '';
+    const tagLine = (note && note.tags.length)
+      ? `<div class="hit-tags">${note.tags.slice(0, 4).map(t =>
+          `<span class="tag-chip">${markHit(t, terms)}</span>`).join('')}${
+          note.tags.length > 4 ? `<span class="meta-hint">等 ${note.tags.length} 项</span>` : ''}</div>`
+      : '';
+
+    const aiTopicCell = r.ai_topic
+      ? `<div class="ell ai-topic-line" title="${esc(r.ai_topic)}">AI 归纳：${markHit(r.ai_topic, terms)}</div>`
+      : `<div class="ai-topic-line hint">AI 归纳：待打标</div>`;
+
     return `<tr onclick="openDetail(${r.id})">
       <td class="nowrap">${fmtTime(r.created_at)}</td>
       <td class="nowrap">${esc(r.city || '—')}</td>
       <td>${esc(r.interviewee_name)}<br><span style="font-size:11.5px;color:var(--text-hint)">${esc(r.interviewee_position)}</span></td>
-      <td class="topic"><div class="ell">${esc(r.topic)}</div>${
-        r.ai_topic
-          ? `<div class="ell ai-topic-line" title="${esc(r.ai_topic)}">AI 归纳：${esc(r.ai_topic)}</div>`
-          : `<div class="ai-topic-line hint">AI 归纳：待打标</div>`
-      }</td>
+      <td class="topic"><div class="ell">${esc(r.topic)}</div>${aiTopicCell}${topicBadge}${tagLine}</td>
       <td class="hide-sm">${esc(r.interviewee_um || '—')}</td>
       <td class="hide-sm">${owner}</td>
       <td class="nowrap">${r.round_count || 0}</td>
