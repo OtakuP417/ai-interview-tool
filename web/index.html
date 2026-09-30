@@ -669,7 +669,9 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
     </div>
     <div class="form-group">
       <label>UM 号 <span class="req">*</span></label>
-      <input type="text" id="f-um" placeholder="被访谈人的员工 UM 号" autocomplete="off">
+      <!-- UM 号统一大写：输入即转，避免大小写混写导致后续按工号归因匹配不上 -->
+      <input type="text" id="f-um" placeholder="被访谈人的员工 UM 号" autocomplete="off"
+        oninput="this.value=this.value.toUpperCase()">
     </div>
     <div class="form-group">
       <label>本次访谈主题 <span class="req">*</span></label>
@@ -836,7 +838,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.09.29-m';
+const APP_BUILD = 'v2026.09.30-a';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -2266,7 +2268,8 @@ async function startInterview() {
   // 城市不再作为归档必填项（报告与海报本来也不出现具体地名）。
   const position = '咨询顾问';
   const city = '';
-  const um = document.getElementById('f-um').value.trim();
+  // UM 统一大写（输入框已 oninput 转换，这里兜住粘贴/自动填充等旁路）
+  const um = document.getElementById('f-um').value.trim().toUpperCase();
   const topic = document.getElementById('f-topic').value.trim();
   const ownerRes = readOwner();
   if (ownerRes.error) return showError(ownerRes.error);

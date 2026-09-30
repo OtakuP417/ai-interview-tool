@@ -68,7 +68,7 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
   ok('线上含节标题归一（normalizeReport）',
     /function normalizeReport\(/.test(idx.t) && /const normalized = normalizeReport\(raw\)/.test(idx.t));
 
-  ok('版本号已更新', /v2026\.09\.29-m/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
+  ok('版本号已更新', /v2026\.09\.30-a/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
 
   console.log('\n[1b] 线上已含语音输入（方案B：腾讯云一句话识别）');
   ok('线上有麦克风按钮', /id="mic-btn"/.test(idx.t) && /function micToggle\(/.test(idx.t));
@@ -107,7 +107,7 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
       (i === 0 || adm.t.indexOf("k: '" + k + "'") > adm.t.indexOf("k: '" + arr[i - 1] + "'")))
     && /有内容但没数字，说服力偏弱/.test(adm.t));
   ok('后台覆盖度已挂进详情渲染', /id="img-box"[\s\S]{0,80}renderCovBar\(row\)/.test(adm.t) || /\$\{renderCovBar\(row\)\}/.test(adm.t));
-  ok('版本号已更新', /v2026\.09\.30-a/.test(adm.t), (adm.t.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
+  ok('版本号已更新', /v2026\.09\.30-c/.test(adm.t), (adm.t.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
 
   console.log('\n[2b] 线上已含主题回归 + 自动打标（P2）');
   ok('线上管理页显示 AI 归纳主题', /AI 归纳：/.test(adm.t));
@@ -166,7 +166,20 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
   ok('记录数自检（可读且非空）', typeof lj.total === 'number' && lj.total >= 8, '实际 ' + lj.total);
   ok('列表含 mail_sent_at 字段', (lj.rows || []).length > 0 && 'mail_sent_at' in lj.rows[0]);
   const r9 = (lj.rows || []).find(x => x.id === 9);
-  ok('#9 已在位（待用户修正）', !!r9, r9 ? r9.interviewee_name : '未找到');
+  ok('#9 已在位', !!r9, r9 ? r9.interviewee_name : '未找到');
+  /* #9 曾把工号填进「姓名位」与「后线对接人位」（姓名位=LING 工号、后线位=另一位工号），
+     2026-09-30 已人工修正。这里用「疑似工号」判据守住：纯字母数字、以字母开头且含数字。 */
+  const lookUm = s => /^[A-Za-z][A-Za-z0-9]{3,}$/.test(String(s || '')) && /\d/.test(String(s || ''));
+  ok('★ #9 姓名位已不是工号形态', !!r9 && !lookUm(r9.interviewee_name), r9 ? r9.interviewee_name : '');
+  ok('★ #9 后线对接人位已不是工号形态', !!r9 && !lookUm(r9.backend_owner_name), r9 ? r9.backend_owner_name : '');
+  /* UM 一律全大写（2026-09-30 起前端输入即转 + 服务端入库归一，双保险） */
+  const lowerUm = (lj.rows || []).filter(x => x.interviewee_um && x.interviewee_um !== String(x.interviewee_um).toUpperCase());
+  ok('★ 全表 UM 已统一大写', lowerUm.length === 0,
+     lowerUm.map(x => x.id + ':' + x.interviewee_um).join(', '));
+  /* 发送状态：手工发在邮箱里的报告也已通过「标记为已发送」补记，列表不再有真假难辨的空值 */
+  const unsent = (lj.rows || []).filter(x => !x.mail_sent_at);
+  ok('★ 全部记录已标记发送状态', unsent.length === 0,
+     '未标记 id: ' + unsent.map(x => x.id).join(', '));
 
   console.log('\n[4b] 自动打标已落库');
   const tagged = (lj.rows || []).filter(x => x.tags_at && x.ai_topic && Array.isArray(x.tags) && x.tags.length);

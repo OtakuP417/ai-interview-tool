@@ -564,7 +564,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.09.30-a';
+const ADMIN_BUILD = 'v2026.09.30-c';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
@@ -1123,6 +1123,7 @@ function renderDetail(row) {
       <button class="ghost-btn" onclick="copyDetail()">复制报告全文</button>
       <button class="ghost-btn" onclick="toggleImgPanel()">生成图片</button>
       <button class="ghost-btn" onclick="exportJson()">导出本条数据</button>
+      ${mailed ? '' : '<button class="ghost-btn" onclick="markSent()" title="报告已经在邮箱里手工发出，只是这个页面没记录">标记为已发送</button>'}
       <button class="mail-btn" id="mail-btn" onclick="sendMail()">${mailed ? '重新发送' : '发送邮件'}</button>
       <span class="spacer-flex"></span>
       <button class="del-btn" onclick="deleteRecord()">删除本条</button>
@@ -1147,9 +1148,11 @@ function renderDetail(row) {
    报告正文由「编辑报告正文」单独入口处理（需留痕）；不可编辑的只剩：
    对话原文、轮次、提交时间、发送状态、修订留痕字段——
    这些是归档的原始凭证，改动会破坏可追溯性。服务端有同样的白名单校验。 */
+/* up:true 的字段在输入与保存时统一转大写（UM 号。
+   大小写混写会让「按工号归因」的匹配对不上，服务端也做同样的归一兜底）。 */
 const EDIT_FIELDS = [
   { k: 'interviewee_name',    label: '被访谈人姓名', col: 1, ph: '如：李示例',   hint: '不要填工号/UM' },
-  { k: 'interviewee_um',      label: '被访谈人 UM 号', col: 1, ph: '如：lishili001' },
+  { k: 'interviewee_um',      label: '被访谈人 UM 号', col: 1, ph: '如：LISHILI001', up: true },
   { k: 'interviewee_position',label: '岗位',        col: 1, ph: '如：咨询顾问' },
   { k: 'city',                label: '所属城市',     col: 1, ph: '如：西安市' },
   { k: 'backend_owner_name',  label: '后线对接人姓名', col: 1, ph: '如：刘龙刚', hint: '不要填工号/UM' },
@@ -1172,7 +1175,7 @@ function openEdit() {
         ${EDIT_FIELDS.map(f => `
           <label class="edit-field" ${f.col === 2 ? 'style="grid-column:1/-1"' : ''}>
             <span class="edit-label">${f.label}${f.hint ? `<em>（${f.hint}）</em>` : ''}</span>
-            <input class="edit-input" id="ed-${f.k}" value="${esc(String(detailRow[f.k] == null ? '' : detailRow[f.k]))}" placeholder="${f.ph}">
+            <input class="edit-input" id="ed-${f.k}" value="${esc(String(detailRow[f.k] == null ? '' : detailRow[f.k]))}" placeholder="${f.ph}"${f.up ? ' oninput="this.value=this.value.toUpperCase()"' : ''}>
           </label>`).join('')}
       </div>
       <div class="edit-foot">
@@ -1196,7 +1199,9 @@ async function saveEdit() {
   const fields = {};
   EDIT_FIELDS.forEach(f => {
     const el = document.getElementById('ed-' + f.k);
-    if (el) fields[f.k] = el.value.trim();
+    if (!el) return;
+    // up 字段统一大写：兜住粘贴/自动填充等绕过 oninput 的路径
+    fields[f.k] = f.up ? el.value.trim().toUpperCase() : el.value.trim();
   });
 
   if (!fields.interviewee_name) {
@@ -1643,6 +1648,28 @@ async function rasterizeAuto(html, css, w, hHint) {
     if (h > MAX_FULL_PNG_H) h = MAX_FULL_PNG_H;
   }
   return rasterizePoster(html, css, w, h);
+}
+
+/* 补记发送状态。
+   有些报告是在邮箱里直接发掉的，没走这个页面的「发送邮件」按钮，
+   归档里的 mail_sent_at 就一直空着：列表显示「未发送」，事后也分不清
+   是漏发还是已发。这个按钮只补记状态，**不会真的再发一封**。
+   服务端 mail_sent_at 平时由发送逻辑独占维护，人工补记走 mark_sent 专用分支。 */
+async function markSent() {
+  if (!currentId || !detailRow) return;
+  if (!confirm('确认这份报告已经在邮箱里发出过了？\n\n这里只补记「已发送」状态，不会真的再发一封邮件。')) return;
+  try {
+    const data = await api({ action: 'mark_sent', id: currentId });
+    const at = data.mail_sent_at || new Date().toISOString();
+    detailRow.mail_sent_at = at;
+    const listRow = currentRows.find(x => x.id === currentId);
+    if (listRow) listRow.mail_sent_at = at;
+    renderDetail(detailRow);
+    renderRows(currentRows);
+    toast('已补记发送状态（' + fmtTime(at) + '）');
+  } catch (e) {
+    toast('补记失败：' + (e && e.message ? e.message : e), true);
+  }
 }
 
 async function sendMail() {

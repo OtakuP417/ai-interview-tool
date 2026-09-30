@@ -426,7 +426,8 @@ function handleSubmit(req, res) {
         city: asText(body.city, 40) || null,
         interviewee_name: asText(body.interviewee_name, 40),
         interviewee_position: asText(body.interviewee_position, 60),
-        interviewee_um: asText(body.interviewee_um, 40) || null,
+        // UM 号一律全大写入库：大小写混写会让「按工号归因」的匹配对不上
+        interviewee_um: asText(body.interviewee_um, 40).toUpperCase() || null,
         topic: asText(body.topic, 120),
         submitter_name: asText(body.submitter_name, 40) || null,
         backend_owner_name: asText(body.backend_owner_name, 40) || null,
@@ -649,6 +650,43 @@ function handleAdmin(req, res) {
         return;
       }
 
+      /* ── 补记邮件发送状态（人工）──
+         mail_sent_at 平时由发送逻辑独占回写（见 update 分支的禁止名单）。
+         但「人直接在邮箱里把报告发掉」这条路径不经过发送逻辑，归档就一直是空：
+         管理页显示「未发送」，列表里也分不清是漏发还是已发。
+         这个 action 是唯一例外入口 —— 只写 mail_sent_at 一个字段，
+         不碰其它任何字段，也不真的发信。 */
+      if (action === "mark_sent") {
+        const id = Math.trunc(Number(body.id) || 0);
+        if (!id) {
+          sendJson(res, 400, { error: "missing_id" });
+          return;
+        }
+        /* 真实发送时刻只有当事人知道，允许补记时指定；不指定则记为当前时间。
+           传了就必须能解析成合法时间，否则会在界面显示 Invalid Date。 */
+        let at = new Date();
+        if (body.sent_at) {
+          const t = new Date(String(body.sent_at));
+          if (isNaN(t.getTime())) {
+            sendJson(res, 400, { error: "invalid_sent_at" });
+            return;
+          }
+          at = t;
+        }
+        pgRequest("PATCH", "id=eq." + id, { mail_sent_at: at.toISOString() })
+          .then(function (r) {
+            if (!r.ok) {
+              sendJson(res, 502, { error: "db_write_failed", status: r.status });
+              return;
+            }
+            sendJson(res, 200, { ok: true, id: id, mail_sent_at: at.toISOString() });
+          })
+          .catch(function () {
+            sendJson(res, 502, { error: "db_write_failed" });
+          });
+        return;
+      }
+
       /* ── 编辑归档字段（修正填错的基础信息，如被访谈人姓名/后线对接人）── */
       if (action === "update") {
         const id = Math.trunc(Number(body.id) || 0);
@@ -659,7 +697,8 @@ function handleAdmin(req, res) {
 
         /* 白名单：允许改「基础信息」这一类人工填报字段，以及**报告正文**。
            严禁放开的：transcript（访谈对话原文，这是无法重建的一手凭证）、
-           id/created_at（标识与时间）、mail_sent_at（发送状态由发送逻辑维护）、
+           id/created_at（标识与时间）、mail_sent_at（发送状态由发送逻辑维护，
+           人工补记只走独立的 mark_sent 分支，不从这里放开）、
            以及 report_rev / report_orig（留痕字段只能由服务端自己维护，
            否则前端可以传 report_rev:0 把「已编辑」痕迹抹掉）。 */
         const EDITABLE = {
@@ -672,11 +711,17 @@ function handleAdmin(req, res) {
           backend_owner_org: 80,
         };
 
+        /* 入库归一：UM 号一律全大写。录入端已自动转大写，这里是不信前端的
+           权威兜底 —— 服务端才是数据一致性的最后一道闸。 */
+        const UPPERCASE_FIELDS = ["interviewee_um"];
+
         const patch = {};
         const raw = body.fields && typeof body.fields === "object" ? body.fields : body;
         Object.keys(EDITABLE).forEach(function (k) {
           if (Object.prototype.hasOwnProperty.call(raw, k)) {
-            patch[k] = asText(raw[k], EDITABLE[k]);
+            var v = asText(raw[k], EDITABLE[k]);
+            if (UPPERCASE_FIELDS.indexOf(k) >= 0) v = v.toUpperCase();
+            patch[k] = v;
           }
         });
 
