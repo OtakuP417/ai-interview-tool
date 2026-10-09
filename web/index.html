@@ -838,7 +838,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.09.30-a';
+const APP_BUILD = 'v2026.10.09-a';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -1349,8 +1349,13 @@ function posterPreviewUrl() {
 }
 
 function rasterizePoster(html, css, w, h) {
-  // 去掉 XML 不允许的控制字符，保证 SVG 解析不炸
-  const clean = String(html).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  // ① 去掉 XML 不允许的控制字符；② 未自闭合的 <br>/<hr> 归一成自闭合 ——
+  // foreignObject 里按 XML 解析，裸 <br> 会让整张 SVG 报错（img.onerror），
+  // 完整长图出不来、邮件就少一张附件。HTML 里自闭合写法完全等价。
+  const clean = String(html)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/<br\s*>/gi, '<br/>')
+    .replace(/<hr\s*>/gi, '<hr/>');
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
     '<foreignObject width="100%" height="100%">' +

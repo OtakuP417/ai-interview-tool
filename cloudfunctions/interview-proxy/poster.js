@@ -845,7 +845,10 @@ function rptBody(text) {
   let para = [];
   const flush = function () {
     if (!para.length) return;
-    out.push('<p class="rpt-p">' + para.join("<br>") + "</p>");
+    /* <br/> 必须自闭合：这段 markup 会被前端拼进 SVG foreignObject，
+       那里按 XML 解析 —— 裸 <br> 直接让整张 SVG 报错（img.onerror），
+       完整长图出不来，邮件就少一张附件（HTML 里 <br/> 与 <br> 等价，两边都合法）。 */
+    out.push('<p class="rpt-p">' + para.join("<br/>") + "</p>");
     para = [];
   };
 

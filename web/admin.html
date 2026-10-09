@@ -564,7 +564,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.09.30-c';
+const ADMIN_BUILD = 'v2026.10.09-a';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
@@ -1573,8 +1573,13 @@ async function fetchPosterHtml(id, kind) {
 }
 
 function rasterizePoster(html, css, w, h) {
-  // 去掉 XML 不允许的控制字符，保证 SVG 解析不炸
-  const clean = String(html).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  // ① 去掉 XML 不允许的控制字符；② 未自闭合的 <br>/<hr> 归一成自闭合 ——
+  // foreignObject 里按 XML 解析，裸 <br> 会让整张 SVG 报错（img.onerror），
+  // 完整长图出不来、补发邮件就少一张附件。HTML 里自闭合写法完全等价。
+  const clean = String(html)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/<br\s*>/gi, '<br/>')
+    .replace(/<hr\s*>/gi, '<hr/>');
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
     '<foreignObject width="100%" height="100%">' +

@@ -68,7 +68,7 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
   ok('线上含节标题归一（normalizeReport）',
     /function normalizeReport\(/.test(idx.t) && /const normalized = normalizeReport\(raw\)/.test(idx.t));
 
-  ok('版本号已更新', /v2026\.09\.30-a/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
+  ok('版本号已更新', /v2026\.10\.09-a/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
 
   console.log('\n[1b] 线上已含语音输入（方案B：腾讯云一句话识别）');
   ok('线上有麦克风按钮', /id="mic-btn"/.test(idx.t) && /function micToggle\(/.test(idx.t));
@@ -107,7 +107,7 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
       (i === 0 || adm.t.indexOf("k: '" + k + "'") > adm.t.indexOf("k: '" + arr[i - 1] + "'")))
     && /有内容但没数字，说服力偏弱/.test(adm.t));
   ok('后台覆盖度已挂进详情渲染', /id="img-box"[\s\S]{0,80}renderCovBar\(row\)/.test(adm.t) || /\$\{renderCovBar\(row\)\}/.test(adm.t));
-  ok('版本号已更新', /v2026\.09\.30-c/.test(adm.t), (adm.t.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
+  ok('版本号已更新', /v2026\.10\.09-a/.test(adm.t), (adm.t.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
 
   console.log('\n[2b] 线上已含主题回归 + 自动打标（P2）');
   ok('线上管理页显示 AI 归纳主题', /AI 归纳：/.test(adm.t));

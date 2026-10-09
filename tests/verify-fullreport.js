@@ -276,6 +276,36 @@ console.log('\n[9] 无回归：邮件正文与一图流');
   ok(poster.renderFlowMarkup(RAW_NEW, META).includes('fv-hook'), '一图流仍然正常渲染');
 }
 
+/* ───────── 10. SVG XML 安全（2026-10-09 线上事故回归） ───────── */
+console.log('\n[10] SVG XML 安全：markup 要进 foreignObject，必须能过 XML 解析');
+{
+  /* 事故复盘：rptBody 的段内软换行用裸 <br> 拼接 → 前端把它拼进 SVG
+     foreignObject（按 XML 解析）→ 整张 SVG 解析失败（img.onerror）→
+     buildPosterPng('full') 静默降级为 null → 邮件只带一图流、没有完整报告。
+     HTML 里 <br/> 与 <br> 完全等价，所以服务端模板一律写自闭合。 */
+  const posterSrc = fs.readFileSync(
+    path.join(__dirname, '..', 'cloudfunctions', 'interview-proxy', 'poster.js'), 'utf8');
+  ok(!posterSrc.includes('join("<br>")'), 'poster.js 源码不再出现 join("<br>")（必须 <br/>）');
+
+  /* 两份夹具 + 一段含软换行的长正文，渲染产物里不许有任何未自闭合的 br/hr */
+  const softLine = '第一行做法说明\n第二行原话：『这么干的』（李示例）';
+  const samples = [
+    ['新格式全文', poster.buildPreviewPayload(RAW_NEW, META, 'full').html],
+    ['旧格式全文', poster.buildPreviewPayload(RAW_OLD, META, 'full').html],
+    ['一图流', poster.buildPreviewPayload(RAW_NEW, META, 'flow').html],
+    ['六节', poster.buildPreviewPayload(RAW_NEW, META, 'six').html],
+  ];
+  const bareBr = /<br\s*(?<!\/)>/i;
+  const bareHr = /<hr\s*(?<!\/)>/i;
+  samples.forEach(function (it) {
+    ok(!bareBr.test(it[1]), it[0] + ' markup 无未自闭合 <br>');
+    ok(!bareHr.test(it[1]), it[0] + ' markup 无未自闭合 <hr>');
+  });
+  /* 正向确认：只要夹具渲染出了 <br/>，说明软换行路径真的被上面两条覆盖到 */
+  const hasBr = samples.some(function (it) { return it[1].includes('<br/>'); });
+  ok(hasBr, '夹具渲染产物中确实出现自闭合 <br/>（软换行路径被覆盖）');
+}
+
 console.log('\n' + '─'.repeat(52));
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exit(fail ? 1 : 0);
