@@ -271,6 +271,65 @@ td.topic .ell {
 .rep-editor-stat.bad { color: var(--danger); font-weight: 500; }
 .rep-editor-stat.good { color: var(--success); }
 
+/* ── AI 辅助修改 ── */
+.ai-note {
+  background: var(--accent-light); color: var(--accent-text);
+  border-radius: var(--radius-sm); padding: 8px 11px;
+  font-size: 11.5px; line-height: 1.75; margin-bottom: 11px;
+}
+.ai-mode { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 9px; font-size: 12.5px; }
+.ai-mode label { display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-muted); }
+.ai-mode label.on { color: var(--accent); font-weight: 500; }
+.ai-secs { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
+.ai-secs label {
+  display: flex; align-items: center; gap: 4px; font-size: 12px;
+  border: 0.5px solid var(--border-strong); border-radius: 999px;
+  padding: 3px 10px; cursor: pointer; color: var(--text-muted);
+  background: var(--bg);
+}
+.ai-secs label.on { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.ai-input-row { display: flex; gap: 8px; align-items: stretch; }
+.ai-input {
+  flex: 1; min-height: 64px; resize: vertical; padding: 8px 11px;
+  font-size: 13px; line-height: 1.65; font-family: inherit;
+  background: var(--bg); color: var(--text);
+  border: 0.5px solid var(--border-strong); border-radius: var(--radius-sm);
+}
+.ai-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.ai-examples { font-size: 11.5px; color: var(--text-hint); line-height: 1.9; margin-top: 7px; }
+.ai-examples b { color: var(--text-muted); font-weight: 500; }
+.ai-examples span {
+  cursor: pointer; border-bottom: 1px dashed var(--border-strong);
+  margin-right: 9px; color: var(--accent-text);
+}
+.ai-examples span:hover { border-bottom-color: var(--accent); }
+.ai-log { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.ai-turn {
+  font-size: 12.5px; line-height: 1.75; padding: 6px 10px;
+  border-radius: var(--radius-sm); white-space: pre-wrap; word-break: break-word;
+}
+.ai-turn.u { background: var(--surface3); }
+.ai-turn.a { background: var(--accent-light); color: var(--accent-text); }
+.ai-turn.e { background: var(--danger-light); color: var(--danger); }
+.ai-diff { margin-top: 14px; border-top: 0.5px solid var(--border); padding-top: 13px; }
+.ai-diff-head { font-size: 12.5px; color: var(--text-muted); line-height: 1.75; margin-bottom: 10px; }
+.ai-op {
+  border: 0.5px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 9px 11px; margin-bottom: 8px; font-size: 12.5px; background: var(--surface);
+}
+.ai-op.off { opacity: .5; }
+.ai-op.bad { border-color: var(--danger); background: var(--danger-light); }
+.ai-op-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11.5px; color: var(--text-hint); flex-wrap: wrap; }
+.ai-op-head strong { font-size: 12px; color: var(--text); font-weight: 600; }
+.ai-line {
+  line-height: 1.8; padding: 3px 9px; margin-bottom: 3px;
+  border-left: 2.5px solid var(--border-strong); border-radius: 0 4px 4px 0;
+  white-space: pre-wrap; word-break: break-word;
+}
+.ai-line.del { border-left-color: var(--danger); background: var(--danger-light); color: var(--danger); }
+.ai-line.add { border-left-color: var(--success); background: var(--success-light); color: var(--text); }
+.ai-op-why { font-size: 11.5px; color: var(--text-hint); margin-top: 6px; line-height: 1.7; }
+
 /* ── 生成图片面板 ── */
 .img-choices { display: flex; gap: 10px; flex-wrap: wrap; }
 .img-choice {
@@ -564,7 +623,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.10.09-a';
+const ADMIN_BUILD = 'v2026.10.10-a';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
@@ -1024,6 +1083,12 @@ async function openDetail(id) {
   currentId = id;
   transcriptOpen = false;
   detailRow = null;
+  /* AI 修改的对话历史是「针对某一份报告说的」，换一条记录必须清掉——
+     否则上一条的语境会被当成这一条的背景发给模型，改出莫名其妙的东西。 */
+  ai.history = [];
+  ai.ops = [];
+  ai.picked = {};
+  ai.lastInstr = '';
   document.getElementById('d-title').textContent = '案例详情';
   document.getElementById('d-body').innerHTML = '<div class="loading">加载中…</div>';
   document.getElementById('drawer').style.display = 'flex';
@@ -1111,6 +1176,7 @@ function renderDetail(row) {
 
     <div id="edit-box" style="display:none"></div>
     <div id="rep-box" style="display:none"></div>
+    <div id="ai-box" style="display:none"></div>
     <div id="img-box" style="display:none"></div>
 
     ${renderCovBar(row)}
@@ -1119,6 +1185,7 @@ function renderDetail(row) {
       ${STATUS_LIST.map(s => `<button class="status-btn ${row.status === s ? 'on' : ''}" onclick="setStatus('${s}')">${s}</button>`).join('')}
       <button class="ghost-btn" onclick="openEdit()">编辑基础信息</button>
       <button class="ghost-btn" onclick="openReportEdit()">编辑报告正文</button>
+      <button class="ghost-btn" onclick="openAiEdit()">AI 辅助修改</button>
       <button class="ghost-btn" onclick="retagOne(${row.id})">重跑打标</button>
       <button class="ghost-btn" onclick="copyDetail()">复制报告全文</button>
       <button class="ghost-btn" onclick="toggleImgPanel()">生成图片</button>
@@ -1164,6 +1231,8 @@ function openEdit() {
   if (!detailRow) return;
   const box = document.getElementById('edit-box');
   if (box.style.display === 'block') { box.style.display = 'none'; return; }
+  document.getElementById('rep-box').style.display = 'none';
+  closeAiEdit();
 
   box.innerHTML = `
     <div class="edit-panel">
@@ -1260,6 +1329,7 @@ function openReportEdit() {
   const box = document.getElementById('rep-box');
   if (box.style.display === 'block') { box.style.display = 'none'; return; }
   document.getElementById('edit-box').style.display = 'none';
+  closeAiEdit();
 
   const md = String(detailRow.report_md || '');
   const secCount = (md.match(/---SECTION---/g) || []).length;
@@ -1354,6 +1424,473 @@ async function saveReportEdit() {
     msg.textContent = '保存失败：' + e.message;
     msg.className = 'edit-msg err';
   }
+}
+
+/* ─── AI 辅助修改报告正文 ──────────────────────────────────
+   为什么会长成这个样子（每一处都是为了让模型少一点自由发挥的余地）：
+
+   1. **模型只输出补丁，永远不输出全文。** 它给的是
+      {sec, op, before, after} —— 没被补丁点到的段落由这里原样保留。
+      「顺手把别处也润色一下」在物理上不可能发生，不需要靠提示词去求它。
+
+   2. **before 必须能在原文里逐字找到**（indexOf）。找不到的那条直接在
+      diff 里标红停用，不让模型对「改哪里」的描述直接生效。
+      模型可以撒谎说某句话存在，但一句都匹配不上就什么都改不了。
+
+   3. **每条改动都带「依据：指令第几条」**，写在 diff 上给人看。
+      对不上任何指令的改动，模型应写进 unclear 而不是 ops。
+
+   4. **不新增写入口。** 应用改动只是把结果填进「编辑报告正文」的文本框，
+      保存仍然走原来的 action:'update' + fields:{report_md}——
+      那条路径自带 report_orig 首次快照、report_rev 累加、分隔符 ≥5 校验。
+      绕开它另存一次，等于让 AI 改过的正文逃掉留痕。
+
+   5. **正文从服务端读**，不拿前端手里这份做定位基准——
+      前端的 report_md 可能还是上一次保存的版本，拿它定位会让补丁对不上。 */
+
+/* 与访谈页的 SECTION_TITLES 对齐（比详情页展示的多一节「海报摘要」）。
+   刻意不写死节数：老报告是 6 节、新报告是 7 节，按实际切出来的段数走。 */
+const AI_SECS = ['背景与挑战','核心做法','关键判断与取舍','结果','可复制的经验点','新人容易踩的坑','海报摘要'];
+
+const AI_EXAMPLES = [
+  '把结果节里的 30% 改成 32%，口径含转介绍',
+  '核心做法第 2 步补一句：客户是自己 2023 年的老客户',
+  '删掉「新人容易踩的坑」里跟主题无关的那条',
+];
+
+let ai = {
+  mode: 'patch',
+  history: [],     // [{role, content, err}]
+  ops: [],         // 渲染用条目：{sec, op, before, after, why, ok, hits}
+  picked: {},      // 下标 → true
+  baseMd: '',      // 发起这一批改动时的正文（定位基准）
+  busy: false,
+  lastInstr: '',   // 供「重试」用
+};
+
+function aiSecName(i) { return AI_SECS[i] || ('第 ' + (i + 1) + ' 节'); }
+
+function aiMdParts(md) { return String(md == null ? '' : md).split('---SECTION---'); }
+
+function trunc(s, n) {
+  const t = String(s || '');
+  return t.length > n ? t.slice(0, n) + '…' : t;
+}
+
+function openAiEdit() {
+  if (!detailRow) return;
+  const box = document.getElementById('ai-box');
+  if (box.style.display === 'block') { closeAiEdit(); return; }
+  document.getElementById('edit-box').style.display = 'none';
+  document.getElementById('rep-box').style.display = 'none';
+
+  ai.ops = [];
+  ai.picked = {};
+  ai.busy = false;
+
+  /* 正文编辑器里如果有没保存的手工改动，AI 改完应用时会以「已保存的版本」
+     为基准整体覆盖 —— 不提醒的话，手工改的那几笔会无声消失。 */
+  const repTa = document.getElementById('rep-md');
+  if (repTa && repTa.value !== String(detailRow.report_md || '')) {
+    toast('正文编辑器里有未保存的手工改动。AI 改动会以「已保存的版本」为基准，应用后会覆盖它。', true);
+  }
+
+  const parts = aiMdParts(detailRow.report_md);
+  box.innerHTML = `
+    <div class="edit-panel">
+      <div class="edit-head">
+        <strong>AI 辅助修改</strong>
+        <span class="edit-note">用一句话说清要改什么；模型只做你点名的那几处，其余一字不动</span>
+      </div>
+
+      <div class="ai-note">
+        这块<strong>不会</strong>让模型重写全文。模型只回「哪一节、把哪句改成哪句」，
+        然后在正文里<strong>逐字定位</strong>再替换 —— 没被点到的段落原样保留。
+        改动会先在下面列出来给你逐条过目，确认后才填进正文编辑器，
+        保存仍走原路径（记修订次数、留模型原文快照）。<br>
+        <strong>要补什么，就直接写出来。</strong>实测「把结果节写得更充实」这类笼统指令，
+        模型会拒绝执行（它不知道该写什么）；而「把这句话说得再具体一点」它会自己加细节 ——
+        这就是自行添加的口子。指令里带上具体内容，改动才是你要的那一版。
+      </div>
+
+      <div class="ai-mode">
+        <label class="${ai.mode === 'patch' ? 'on' : ''}" id="ai-mode-patch">
+          <input type="radio" name="ai-mode" value="patch" ${ai.mode === 'patch' ? 'checked' : ''} onchange="aiSyncMode()">定点修改（替换 / 补充 / 删除）
+        </label>
+        <label class="${ai.mode === 'section' ? 'on' : ''}" id="ai-mode-section">
+          <input type="radio" name="ai-mode" value="section" ${ai.mode === 'section' ? 'checked' : ''} onchange="aiSyncMode()">按补充重写指定节
+        </label>
+      </div>
+
+      <div id="ai-secs-wrap" style="display:${ai.mode === 'section' ? 'block' : 'none'}">
+        <div class="edit-label" style="margin-bottom:5px">要重写哪几节（其余节一个字都不会动）</div>
+        <div class="ai-secs" id="ai-secs">
+          ${parts.map((_, i) => `
+            <label id="ai-sec-${i + 1}">
+              <input type="checkbox" onchange="aiSyncSecs()">${esc(aiSecName(i))}
+            </label>`).join('')}
+        </div>
+      </div>
+
+      <div class="ai-input-row">
+        <textarea class="ai-input" id="ai-ta" placeholder="例：把结果节里的 30% 改成 32%，口径含转介绍&#10;例：核心做法第 2 步补一句——客户是自己 2023 年的老客户"></textarea>
+        <button class="save-btn" id="ai-send" onclick="aiSend()">让 AI 改</button>
+      </div>
+      <div class="ai-examples">
+        <b>可以这样写：</b>${AI_EXAMPLES.map(e => `<span onclick="aiFillExample(this)">${esc(e)}</span>`).join('')}
+      </div>
+
+      <div class="ai-log" id="ai-log"></div>
+      <div class="ai-diff" id="ai-diff"></div>
+
+      <div class="edit-foot">
+        <span class="edit-msg" id="ai-top-msg"></span>
+        <span class="spacer-flex"></span>
+        <button class="ghost-btn" onclick="aiResetAll()">清空本轮的对话与改动</button>
+        <button class="ghost-btn" onclick="closeAiEdit()">收起</button>
+      </div>
+    </div>`;
+  box.style.display = 'block';
+  renderAiLog();
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeAiEdit() {
+  const box = document.getElementById('ai-box');
+  if (box) box.style.display = 'none';
+}
+
+function aiFillExample(el) {
+  const ta = document.getElementById('ai-ta');
+  if (ta) { ta.value = el.textContent; ta.focus(); }
+}
+
+/** 模式切换：只改 DOM 上的高亮，状态一律现场从 DOM 读，避免两边不一致。 */
+function aiSyncMode() {
+  const r = document.querySelector('input[name="ai-mode"]:checked');
+  ai.mode = r && r.value === 'section' ? 'section' : 'patch';
+  const a = document.getElementById('ai-mode-patch');
+  const b = document.getElementById('ai-mode-section');
+  if (a) a.className = ai.mode === 'patch' ? 'on' : '';
+  if (b) b.className = ai.mode === 'section' ? 'on' : '';
+  const wrap = document.getElementById('ai-secs-wrap');
+  if (wrap) wrap.style.display = ai.mode === 'section' ? 'block' : 'none';
+}
+
+function aiSyncSecs() {
+  const wrap = document.getElementById('ai-secs');
+  if (!wrap) return;
+  Array.prototype.forEach.call(wrap.querySelectorAll('label'), function (lab) {
+    const cb = lab.querySelector('input');
+    lab.className = cb && cb.checked ? 'on' : '';
+  });
+}
+
+function aiTargets() {
+  const wrap = document.getElementById('ai-secs');
+  if (!wrap) return [];
+  const out = [];
+  Array.prototype.forEach.call(wrap.querySelectorAll('label'), function (lab, i) {
+    const cb = lab.querySelector('input');
+    if (cb && cb.checked) out.push(i + 1);
+  });
+  return out;
+}
+
+function aiResetAll() {
+  ai.history = [];
+  ai.ops = [];
+  ai.picked = {};
+  ai.lastInstr = '';
+  renderAiLog();
+  renderAiDiff([]);
+  setAiMsg('', '');
+}
+
+function renderAiLog() {
+  const box = document.getElementById('ai-log');
+  if (!box) return;
+  box.innerHTML = ai.history.map(function (h) {
+    const cls = h.role === 'user' ? 'u' : (h.err ? 'e' : 'a');
+    return `<div class="ai-turn ${cls}">${h.role === 'user' ? '你：' : 'AI：'}${esc(h.content)}</div>`;
+  }).join('');
+}
+
+function setAiMsg(text, cls) {
+  const m = document.getElementById('ai-top-msg');
+  if (m) { m.textContent = text || ''; m.className = 'edit-msg ' + (cls || ''); }
+}
+
+function setAiBusy(b) {
+  ai.busy = b;
+  const btn = document.getElementById('ai-send');
+  const ta = document.getElementById('ai-ta');
+  if (btn) { btn.disabled = b; btn.textContent = b ? '思考中…' : '让 AI 改'; }
+  if (ta) ta.disabled = b;
+}
+
+/** 把服务端回的补丁转成可渲染的条目，并当场判定每条能不能在原文里定位。 */
+function aiBuildOps(data) {
+  const parts = aiMdParts(ai.baseMd);
+
+  if (data.mode === 'section') {
+    return (data.sections || []).map(function (s) {
+      return {
+        sec: s.sec,
+        op: 'rewrite',
+        before: String(parts[s.sec - 1] || '').trim(),
+        after: String(s.body || '').trim(),
+        why: '',
+        ok: true,
+        hits: 1,
+      };
+    });
+  }
+
+  return (data.ops || []).map(function (o) {
+    const body = String(parts[o.sec - 1] || '');
+    let hits = 0;
+    let at = body.indexOf(o.before);
+    while (at >= 0) { hits++; at = body.indexOf(o.before, at + o.before.length); }
+    return {
+      sec: o.sec,
+      op: o.op,
+      before: o.before,
+      after: o.after,
+      why: o.why,
+      ok: hits > 0,
+      hits: hits,
+    };
+  });
+}
+
+async function aiSend() {
+  if (!currentId || !detailRow || ai.busy) return;
+
+  const ta = document.getElementById('ai-ta');
+  const instruction = ta ? String(ta.value || '').trim() : '';
+  if (!instruction) { setAiMsg('先写一句要改什么', 'err'); return; }
+
+  const targets = aiTargets();
+  if (ai.mode === 'section' && !targets.length) {
+    setAiMsg('「按补充重写指定节」要先勾选要重写哪几节', 'err');
+    return;
+  }
+
+  // 定位基准 = 库里那一份（服务端也是拿它算的补丁）。
+  // 注意：正文编辑器里没保存的手工改动不参与定位，应用时会被覆盖 —— openAiEdit 里已提示。
+  ai.baseMd = String(detailRow.report_md || '');
+
+  ai.lastInstr = instruction;
+  ai.history.push({ role: 'user', content: instruction });
+  if (ta) ta.value = '';
+  renderAiLog();
+  setAiMsg('正在让模型改…', '');
+  setAiBusy(true);
+
+  try {
+    const data = await api({
+      action: 'ai_edit',
+      id: currentId,
+      mode: ai.mode,
+      instruction: instruction,
+      targets: targets,
+      // 历史只带「已说过的话」，不含本轮刚 push 的这条
+      history: ai.history.slice(0, -1).map(function (h) {
+        return { role: h.role, content: h.content };
+      }),
+    });
+
+    ai.ops = aiBuildOps(data);
+    ai.picked = {};
+    ai.ops.forEach(function (o, i) { ai.picked[i] = o.ok; });
+
+    const bad = ai.ops.filter(function (o) { return !o.ok; }).length;
+    let summary;
+    if (data.note) {
+      summary = data.note;
+    } else if (ai.mode === 'section') {
+      summary = '准备重写第 ' + ai.ops.map(function (o) { return o.sec; }).join('、') +
+        ' 节。下面是重写后的内容，确认了再应用。';
+    } else if (!ai.ops.length) {
+      summary = '模型没有给出任何改动。';
+    } else {
+      summary = '准备了 ' + ai.ops.length + ' 处改动' +
+        (bad ? '，其中 ' + bad + ' 处没能在正文里逐字定位到（已自动停用）' : '') +
+        '。下面是逐条对照，勾掉不想采纳的，再点「应用改动」。';
+    }
+    ai.history.push({ role: 'assistant', content: summary });
+    renderAiLog();
+    renderAiDiff(data.unclear || []);
+    setAiMsg('', '');
+  } catch (e) {
+    ai.history.push({ role: 'assistant', content: '没改成：' + e.message, err: true });
+    renderAiLog();
+    setAiMsg('请求失败：' + e.message, 'err');
+  } finally {
+    setAiBusy(false);
+  }
+}
+
+function renderAiDiff(unclear) {
+  const box = document.getElementById('ai-diff');
+  if (!box) return;
+
+  if (!ai.ops.length && !(unclear && unclear.length)) { box.innerHTML = ''; return; }
+
+  const bad = ai.ops.filter(function (o) { return !o.ok; }).length;
+  let html = '<div class="ai-diff-head">' +
+    (ai.ops.length
+      ? '共 <strong>' + ai.ops.length + '</strong> 处改动' +
+        (bad ? '，<strong style="color:var(--danger)">' + bad + '</strong> 处未能在正文里定位到（已停用）' : '') +
+        '。逐条勾选要采纳的，再点「应用改动」——应用后正文会填进下方的编辑器，还要再点一次「保存正文」才真正落库。'
+      : '模型没有给出改动。') +
+    '</div>';
+
+  ai.ops.forEach(function (o, i) {
+    const on = !!ai.picked[i];
+    const cls = 'ai-op' + (o.ok ? '' : ' bad') + (on ? '' : ' off');
+    const kind = o.op === 'rewrite' ? '整节重写'
+      : o.op === 'delete' ? '删除'
+      : o.op === 'insert_after' ? '补充' : '替换';
+
+    html += `<div class="${cls}">
+      <div class="ai-op-head">
+        <input type="checkbox" ${on ? 'checked' : ''} ${o.ok ? '' : 'disabled'}
+          onchange="aiPick(${i}, this.checked)">
+        <strong>第 ${o.sec} 节 · ${esc(aiSecName(o.sec - 1))}</strong>
+        <span>${kind}</span>
+        ${o.ok ? '' : '<span style="color:var(--danger)">⚠ 原文里找不到这句，无法定位</span>'}
+        ${o.ok && o.hits > 1 ? '<span style="color:var(--warning-text)">⚠ 原文中出现 ' + o.hits + ' 次，只会替换第一处</span>' : ''}
+      </div>`;
+
+    if (o.op === 'rewrite') {
+      html += `<div class="ai-line add">${esc(trunc(o.after, 1200))}</div>`;
+    } else if (o.op === 'insert_after') {
+      html += `<div class="ai-line del">插在：${esc(trunc(o.before, 300))}</div>
+               <div class="ai-line add">补充：${esc(trunc(o.after, 800))}</div>`;
+    } else if (o.op === 'delete') {
+      html += `<div class="ai-line del">删除：${esc(trunc(o.before, 400))}</div>`;
+    } else {
+      html += `<div class="ai-line del">原：${esc(trunc(o.before, 400))}</div>
+               <div class="ai-line add">改：${esc(trunc(o.after, 800))}</div>`;
+    }
+
+    if (o.why) html += `<div class="ai-op-why">依据：${esc(o.why)}</div>`;
+    html += '</div>';
+  });
+
+  (unclear || []).forEach(function (u) {
+    html += `<div class="ai-op">
+      <div class="ai-op-head"><strong style="color:var(--warning-text)">模型没把握、没有动的地方</strong></div>
+      ${esc(u)}</div>`;
+  });
+
+  html += `<div class="edit-foot">
+      <span class="edit-msg" id="ai-msg"></span>
+      <span class="spacer-flex"></span>
+      <button class="ghost-btn" onclick="aiResetResult()">丢掉这一批</button>
+      <button class="ghost-btn" onclick="aiRetry()">换个说法重试</button>
+      <button class="save-btn" id="ai-apply" onclick="aiApply()">应用改动</button>
+    </div>`;
+
+  box.innerHTML = html;
+}
+
+function aiPick(i, on) {
+  ai.picked[i] = !!on;
+  const all = document.querySelectorAll('#ai-diff .ai-op');
+  if (all[i]) all[i].className = 'ai-op' + (ai.ops[i].ok ? '' : ' bad') + (on ? '' : ' off');
+  const msg = document.getElementById('ai-msg');
+  if (msg) msg.textContent = '';
+}
+
+function aiResetResult() {
+  ai.ops = [];
+  ai.picked = {};
+  renderAiDiff([]);
+}
+
+function aiRetry() {
+  const ta = document.getElementById('ai-ta');
+  if (ta && !ta.value && ai.lastInstr) ta.value = ai.lastInstr;
+  setAiMsg('改一下说法后重新点「让 AI 改」', '');
+  if (ta) ta.focus();
+}
+
+/**
+ * 把选中的改动落到正文上，然后**交给「编辑报告正文」面板做最终核对与保存**。
+ *
+ * 刻意不在这里直接调保存接口：
+ *   ① 人需要在完整的正文里再看一眼，而不是只看 diff；
+ *   ② 保存必须走 action:'update' 这条唯一的留痕路径，
+ *      这里再写一次库就等于绕开 report_rev / report_orig。
+ */
+function aiApply() {
+  const idx = [];
+  ai.ops.forEach(function (o, i) { if (ai.picked[i] && o.ok) idx.push(i); });
+  if (!idx.length) {
+    const m = document.getElementById('ai-msg');
+    if (m) { m.textContent = '没有勾选任何可用的改动'; m.className = 'edit-msg err'; }
+    return;
+  }
+
+  const parts = aiMdParts(ai.baseMd);
+  let applied = 0;
+  let skipped = 0;
+
+  idx.forEach(function (i) {
+    const o = ai.ops[i];
+    const s = o.sec - 1;
+    if (s < 0 || s >= parts.length) { skipped++; return; }
+
+    if (o.op === 'rewrite') {
+      parts[s] = '\n\n' + o.after + '\n\n';
+      applied++;
+      return;
+    }
+
+    const at = parts[s].indexOf(o.before);
+    if (at < 0) { skipped++; return; }
+
+    if (o.op === 'delete') {
+      parts[s] = parts[s].slice(0, at) + parts[s].slice(at + o.before.length);
+    } else if (o.op === 'insert_after') {
+      const end = at + o.before.length;
+      parts[s] = parts[s].slice(0, end) + '\n\n' + o.after + parts[s].slice(end);
+    } else {
+      parts[s] = parts[s].slice(0, at) + o.after + parts[s].slice(at + o.before.length);
+    }
+    applied++;
+  });
+
+  const md = parts.join('---SECTION---');
+  const secCount = (md.match(/---SECTION---/g) || []).length;
+  if (secCount < 5) {
+    const m = document.getElementById('ai-msg');
+    if (m) {
+      m.textContent = '应用后分隔符只剩 ' + secCount + ' 个（需 ≥5），已中止。请检查是否误删了整节。';
+      m.className = 'edit-msg err';
+    }
+    return;
+  }
+
+  // 切到正文编辑器做最终核对——保存按钮、留痕、分隔符校验全用那一套
+  closeAiEdit();
+  closeReportEdit();
+  openReportEdit();
+  const ta = document.getElementById('rep-md');
+  if (ta) {
+    ta.value = md;
+    checkRepSections();
+    ta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  const m = document.getElementById('rep-msg');
+  if (m) {
+    m.textContent = 'AI 已应用 ' + applied + ' 处改动' + (skipped ? '（' + skipped + ' 处跳过）' : '');
+    m.className = 'edit-msg ok';
+  }
+  toast('已填入 ' + applied + ' 处 AI 改动，核对后点「保存正文」。');
 }
 
 /** 展开/收起「模型原文」对照，并保持展开态跨重绘有效。 */

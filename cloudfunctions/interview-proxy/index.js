@@ -4,7 +4,8 @@
  * 职责：
  *   1. POST /            访谈对话（DeepSeek 转发，流式）。DeepSeek Key 只存在于服务端环境变量。
  *   2. POST /api/submit  提交归档（写入 CloudBase PostgreSQL）
- *   3. POST /api/admin   管理端：登录换 token / 列表 / 详情 / 改状态 / 删除
+ *   3. POST /api/admin   管理端：登录换 token / 列表 / 详情 / 改状态 / 删除 /
+ *                        AI 辅助修改（ai_edit，只生成补丁不写库）
  *   4. POST /api/mail    把归档报告发邮件给后线对接人（抄送业务管理人员）
  *
  * 环境变量：
@@ -35,6 +36,7 @@ const { sendReportMail } = require("./mailer");
 const poster = require("./poster");
 const tagger = require("./tagger");
 const asr = require("./asr");
+const aiEditor = require("./ai-editor");
 
 /**
  * CORS 由 CloudBase 网关统一注入。
@@ -949,6 +951,104 @@ function handleAdmin(req, res) {
               .then(function () { next(i + 1); });
           };
           next(0);
+        });
+        return;
+      }
+
+      /* ── AI 辅助修改报告（生成补丁，不写库）──
+         人话说的「把结果节的 30% 改成 32%」「补一句这客户是老客户转介绍」，
+         由模型翻译成结构化补丁回给前端。这里**刻意不写库**：
+         真正的落地仍然走上面的 action:'update' + fields:{report_md}——
+         那条路径自带 report_orig 首次快照、report_rev 累加、分隔符 ≥5 的服务端校验。
+         在这里再开一个写入口，等于给「AI 改过的正文」留一条绕开留痕的暗道。
+
+         正文从库里读，不采信前端传的 report_md：前端手里那份可能还是旧版本，
+         拿它做定位基准会让补丁对不上原文。 */
+      if (action === "ai_edit") {
+        const apiKey = env("DEEPSEEK_API_KEY", "");
+        if (!apiKey) {
+          sendJson(res, 500, { error: "server_not_configured" });
+          return;
+        }
+        const id = Math.trunc(Number(body.id) || 0);
+        if (!id) {
+          sendJson(res, 400, { error: "missing_id" });
+          return;
+        }
+
+        const mode = asText(body.mode, 20) === "section" ? "section" : "patch";
+        const instruction = asText(body.instruction, 4000);
+        if (!instruction) {
+          sendJson(res, 400, { error: "instruction_required" });
+          return;
+        }
+
+        const targets = Array.isArray(body.targets)
+          ? body.targets
+              .map(function (n) { return Math.trunc(Number(n) || 0); })
+              .filter(function (n) { return n > 0; })
+          : [];
+        if (mode === "section" && !targets.length) {
+          sendJson(res, 400, { error: "targets_required" });
+          return;
+        }
+
+        /* 前几轮对话只作语境，截断到最近 8 条、每条 800 字，
+           防止历史累积把 prompt 撑到影响补丁预算。 */
+        const history = Array.isArray(body.history)
+          ? body.history.slice(-8).map(function (h) {
+              return {
+                role: h && h.role === "assistant" ? "assistant" : "user",
+                content: asText(h && h.content, 800),
+              };
+            })
+          : [];
+
+        pgRequest("GET", "id=eq." + id + "&limit=1&select=report_md", null).then(function (r) {
+          if (!r.ok) {
+            sendJson(res, 502, { error: "db_read_failed", status: r.status });
+            return;
+          }
+          const cur = Array.isArray(r.data) ? r.data[0] : null;
+          if (!cur) {
+            sendJson(res, 404, { error: "not_found" });
+            return;
+          }
+
+          return aiEditor
+            .editReport({
+              apiKey: apiKey,
+              reportMd: cur.report_md,
+              instruction: instruction,
+              mode: mode,
+              targets: targets,
+              history: history,
+            })
+            .then(function (out) {
+              sendJson(res, 200, Object.assign({ ok: true, id: id, instruction: instruction }, out));
+            })
+            .catch(function (e) {
+              const msg = String((e && e.message) || e);
+              /* 「没有需要改的地方」和「输出不是合法 JSON」都当**正常结果**回 200：
+                 前端要把这句话显示给操作的人看，让人知道模型这次为什么空手而归。
+                 其余（没配 Key、上游超时、网络抖动）才是真失败，如实报错。 */
+              if (msg === "ai_edit_no_change" || msg === "ai_edit_unparsable_output") {
+                sendJson(res, 200, {
+                  ok: true,
+                  id: id,
+                  instruction: instruction,
+                  mode: mode,
+                  ops: [],
+                  sections: [],
+                  unclear: [],
+                  note: msg === "ai_edit_no_change"
+                    ? "按这条要求，模型认为没有需要改动的地方。"
+                    : "模型这次的输出不是合法 JSON，没能解析。可以换个说法再试一次。",
+                });
+                return;
+              }
+              sendJson(res, 502, { error: "ai_edit_failed", detail: msg.slice(0, 300) });
+            });
         });
         return;
       }
