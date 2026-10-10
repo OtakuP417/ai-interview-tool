@@ -623,7 +623,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.10.10-a';
+const ADMIN_BUILD = 'v2026.10.10-b';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
@@ -1222,7 +1222,7 @@ const EDIT_FIELDS = [
   { k: 'interviewee_um',      label: '被访谈人 UM 号', col: 1, ph: '如：LISHILI001', up: true },
   { k: 'interviewee_position',label: '岗位',        col: 1, ph: '如：咨询顾问' },
   { k: 'city',                label: '所属城市',     col: 1, ph: '如：西安市' },
-  { k: 'backend_owner_name',  label: '后线对接人姓名', col: 1, ph: '如：刘龙刚', hint: '不要填工号/UM' },
+  { k: 'backend_owner_name',  label: '后线对接人姓名', col: 1, ph: '如：李示例', hint: '不要填工号/UM' },
   { k: 'backend_owner_org',   label: '对接人所属中心', col: 1, ph: '如：西安第三咨询中心' },
   { k: 'topic',               label: '案例主题',     col: 2, ph: '如：小微企业主续贷提额' },
 ];

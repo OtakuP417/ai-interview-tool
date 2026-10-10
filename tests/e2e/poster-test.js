@@ -11,7 +11,7 @@ const sample = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures',
 const raw = sample.sections.join('\n---SECTION---\n');
 
 const meta = {
-  name: '李娟', position: '咨询顾问', city: '西安市', um: 'EXAMPLE002',
+  name: '何示例', position: '咨询顾问', city: '西安市', um: 'EXAMPLE002',
   topic: '房抵二押签约', date: '2026年9月24日',
   owner: '张示例', ownerOrg: '西安第二咨询中心',
 };

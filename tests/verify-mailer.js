@@ -50,7 +50,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const m3 = buildMessage({
   from: 'demo.inbox@example.com', to: ['a@lu.com'],
   subject: '访谈报告', text: '正文', html: '<div></div>',
-  attachments: [{ filename: '案例经验萃取-李娟-20260924.png', contentType: 'image/png', content: png }],
+  attachments: [{ filename: '案例经验萃取-何示例-20260924.png', contentType: 'image/png', content: png }],
 });
 ok('附件头 image/png', m3.includes('Content-Type: image/png'));
 ok('附件名 RFC2047 编码', m3.includes('name="=?UTF-8?B?'));

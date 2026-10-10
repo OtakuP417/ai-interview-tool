@@ -121,12 +121,13 @@ console.log("\n=== 字段来源：被访谈人 ≠ 后线对接人 ===\n");
   t("7 条版页眉显示被访谈人 李示例", /李示例/.test(hd7), hd7.trim());
 
   // #9：后线对接人字段本身是 UM 形态（归档数据有误），必须整段隐藏，
-  // 且绝不能编造人名（曾误把 #5 的被访谈人"李娟"填进来）
+  // 且绝不能编造人名（历史上出过把别的单据的被访谈人姓名填进来）
   const d9 = domOf(E.SAMPLE_9);
   const sub9 = [...d9.querySelectorAll(".sub")].map(x => x.textContent).join("");
   t("9 条版后线对接整段隐藏（源字段是 UM）", !/后线对接/.test(sub9), sub9.slice(0, 60));
-  t("9 条版不得出现编造的人名 李娟", !/李娟/.test(htmlOf(E.SAMPLE_9)));
-  t("9 条版不得出现李娟的 UM EXAMPLE002", !/EXAMPLE002/i.test(htmlOf(E.SAMPLE_9)));
+  /* 这条断言原本写的是 #5 被访谈人的真实姓名，脱敏后改为用其 UM 表达同一件事：
+     姓名位一旦被回填别处的数据，UM（EXAMPLE002）同样会露出来。 */
+  t("9 条版不得回填 #5 的被访谈人标识（EXAMPLE002）", !/EXAMPLE002/i.test(htmlOf(E.SAMPLE_9)));
   t("9 条版页眉显示被访谈人标识 EXAMPLE001", /EXAMPLE001/.test(d9.querySelector(".hd-r").textContent),
     d9.querySelector(".hd-r").textContent.trim());
   t("9 条版页眉不出现两个 UM 并列",

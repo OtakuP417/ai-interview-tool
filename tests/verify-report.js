@@ -173,7 +173,7 @@ console.log('④ assessInterview（真实数据校准）');
 // 四份已归档报告里，被访谈人真实发言的字数与条数
 const CASES = [
   { name: '#8 王示例   ', rounds: 9,  chars: 56,  long: 0, want: false },
-  { name: '#5 李娟   ', rounds: 11, chars: 358, long: 1, want: false },
+  { name: '#5 何示例  ', rounds: 11, chars: 358, long: 1, want: false },
   { name: '#6 吴示例 ', rounds: 12, chars: 736, long: 4, want: true  },
   { name: '#7 李示例   ', rounds: 13, chars: 855, long: 5, want: true  },
 ];
