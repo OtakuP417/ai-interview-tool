@@ -104,7 +104,7 @@ ok("失败不阻断打字（用轻提示不用 alert）", /function micToast/.te
 ok("用后释放麦克风与音频上下文", /getTracks\(\)\.forEach/.test(WEB) && /micCtx\.close\(\)/.test(WEB));
 
 console.log("\n[7] 版本号");
-ok("index.html APP_BUILD 已 bump 到 v2026.10.10-a", /APP_BUILD = 'v2026\.10\.10-a'/.test(WEB));
+ok("index.html APP_BUILD 已 bump 到 v2026.10.10-b", /APP_BUILD = 'v2026\.10\.10-b'/.test(WEB));
 
 console.log("\n[12] ★★★ 接口 URL 拼接契约（2026-09-29 十轮排查最终根因，绝不许回归）");
 ok("★★ 常量已改名 API_ORIGIN（语义=域名根，避免再被误读成「含 /api 的基址」）",

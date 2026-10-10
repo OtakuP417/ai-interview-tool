@@ -306,7 +306,7 @@ console.log('\n[10] SVG XML 安全：markup 要进 foreignObject，必须能过 
   ok(hasBr, '夹具渲染产物中确实出现自闭合 <br/>（软换行路径被覆盖）');
 }
 
-/* ───────── 11. 报告截断防线（2026-10-10，吴敏 id=19 事故回归） ───────── */
+/* ───────── 11. 报告截断防线（2026-10-10，id=19 事故回归） ───────── */
 console.log('\n[11] 报告截断防线：残缺报告不允许静默归档');
 {
   const web = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');

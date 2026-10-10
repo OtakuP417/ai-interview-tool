@@ -110,7 +110,7 @@ const settle = (ms = 250) => new Promise(r => setTimeout(r, ms));
   })());
 
   /* ══════════════ 场景 B：访谈进行中被刷新 ══════════════ */
-  sec('[B] 访谈进行到第 3 轮被刷新 · 草稿应落盘并可续接');
+  sec('[B] 访谈进行到第 6 轮被刷新 · 草稿应落盘并可续接');
 
   // 1. 填表 + 开始访谈（岗位与城市已从表单移除，由代码固定/留空）
   d.getElementById('f-name').value = '康红钦';
@@ -126,15 +126,32 @@ const settle = (ms = 250) => new Promise(r => setTimeout(r, ms));
   t('页眉岗位固定为咨询顾问', /咨询顾问/.test(d.getElementById('header-name').textContent));
   t('页眉不再出现城市分隔符残留', !/^· /.test(d.getElementById('header-meta').textContent.trim()));
 
-  // 2. 模拟 3 轮用户提问
+  // 2. 先聊 3 轮，用来验证「轮次明显不够」时报告硬闸生效
   for (let i = 1; i <= 3; i++) {
+    d.getElementById('user-input').value = '这是第 ' + i + ' 轮的回答内容';
+    await w.sendMessage();
+    await settle(120);
+  }
+
+  /* ★ 2026-10-10 新增硬闸：MIN_REPORT_ROUNDS = 5 以下直接不出报告。
+     教训来自 id=17 那份 —— 只聊了 3 轮就生成了报告，通篇"待补"，
+     还随自动发信一起发了出去。 */
+  let gateAlert = '';
+  w.alert = (m) => { gateAlert = String(m); };
+  await w.endAndReport();
+  t('★ 少于 5 轮时生成报告被拦下（且不进入报告页）',
+    /只有 3 轮/.test(gateAlert) && !d.getElementById('report-screen').classList.contains('active'), gateAlert);
+  w.alert = () => {};
+
+  // 继续聊到 6 轮（≥ 硬闸），后面场景 C 才能走到「素材不足」提示面板那条路径
+  for (let i = 4; i <= 6; i++) {
     d.getElementById('user-input').value = '这是第 ' + i + ' 轮的回答内容';
     await w.sendMessage();
     await settle(120);
   }
   // ★ 2026-09-29：徽标不再暴露门槛分母（8 是内部最低线，露出会让被访谈人
   //   误以为"聊满 8 轮就结束"）。改为只显示进度"已聊 N 轮"。
-  t('轮次徽标显示当前轮次', /已聊 3 轮/.test(d.getElementById('round-badge').textContent), d.getElementById('round-badge').textContent);
+  t('轮次徽标显示当前轮次', /已聊 6 轮/.test(d.getElementById('round-badge').textContent), d.getElementById('round-badge').textContent);
   t('★ 徽标不暴露门槛分母（不出现 / 8）', !/\/\s*8|\/8/.test(d.getElementById('round-badge').textContent), d.getElementById('round-badge').textContent);
   t('★ 未达门槛时按钮不诱导"凑轮数"（不出现"还差 N 轮"）', !/还差/.test(d.getElementById('report-btn').textContent), d.getElementById('report-btn').textContent);
   t('★ 未达门槛时按钮提示"再聊一会儿"', /再聊一会儿/.test(d.getElementById('report-btn').textContent), d.getElementById('report-btn').textContent);
@@ -145,13 +162,13 @@ const settle = (ms = 250) => new Promise(r => setTimeout(r, ms));
   t('草稿含 UM 号', saved.interviewee.um === '87654321');
   t('草稿含后线对接人', saved.interviewee.owner === '王珍', String(saved.interviewee.owner));
   t('草稿含对接人所属中心（自动带出）', saved.interviewee.ownerOrg === '西安第一咨询中心', String(saved.interviewee.ownerOrg));
-  t('草稿轮次 = 3', saved.roundCount === 3, String(saved.roundCount));
-  t('草稿含 9 条消息（1 system + 1 开场白指令 + 1 开场白回复 + 3 问 + 3 答）', saved.messages.length === 9, String(saved.messages.length));
+  t('草稿轮次 = 6', saved.roundCount === 6, String(saved.roundCount));
+  t('草稿含 15 条消息（1 system + 1 开场白指令 + 1 开场白回复 + 6 问 + 6 答）', saved.messages.length === 15, String(saved.messages.length));
   t('开场白指令带 internal 标记', saved.messages.filter(m => m.internal).length === 1,
     'internal 条数 ' + saved.messages.filter(m => m.internal).length);
-  t('真实用户发言 3 条', saved.messages.filter(m => m.role === 'user' && !m.internal).length === 3,
+  t('真实用户发言 6 条', saved.messages.filter(m => m.role === 'user' && !m.internal).length === 6,
     String(saved.messages.filter(m => m.role === 'user' && !m.internal).length));
-  t('开场白不计入轮次（roundCount = 3）', saved.roundCount === 3, String(saved.roundCount));
+  t('开场白不计入轮次（roundCount = 6）', saved.roundCount === 6, String(saved.roundCount));
   dom.window.close();
 
   /* ── 刷新：用同一个 store 新建会话 ── */
@@ -164,7 +181,7 @@ const settle = (ms = 250) => new Promise(r => setTimeout(r, ms));
   const info = d.getElementById('draft-info').textContent;
   t('提示含姓名', /康红钦/.test(info), info);
   t('提示含岗位', /咨询顾问/.test(info), info);
-  t('提示含轮次', /3 轮/.test(info), info);
+  t('提示含轮次', /6 轮/.test(info), info);
   t('提示含相对时间', /刚刚|分钟前|小时前/.test(info), info);
 
   console.log('       提示文案：' + info.trim());
@@ -177,17 +194,17 @@ const settle = (ms = 250) => new Promise(r => setTimeout(r, ms));
   t('页眉 UM 号已还原', /87654321/.test(d.getElementById('header-meta').textContent));
   t('页眉不再显示城市（字段已移除）', !/西安市/.test(d.getElementById('header-meta').textContent));
   const msgCount = d.getElementById('messages').querySelectorAll('.msg').length;
-  t('对话历史渲染出 7 条气泡（1 开场白回复 + 3 问 + 3 答）', msgCount === 7, '实际 ' + msgCount);
+  t('对话历史渲染出 13 条气泡（1 开场白回复 + 6 问 + 6 答）', msgCount === 13, '实际 ' + msgCount);
   t('历史含第 1 轮回答', /这是第 1 轮的回答内容/.test(d.getElementById('messages').textContent));
-  t('历史含第 3 轮回答', /这是第 3 轮的回答内容/.test(d.getElementById('messages').textContent));
+  t('历史含第 6 轮回答', /这是第 6 轮的回答内容/.test(d.getElementById('messages').textContent));
   t('历史不含系统指令文字', !/请开始这次访谈/.test(d.getElementById('messages').textContent));
-  t('轮次徽标还原为已聊 3 轮', /已聊 3 轮/.test(d.getElementById('round-badge').textContent), d.getElementById('round-badge').textContent);
+  t('轮次徽标还原为已聊 6 轮', /已聊 6 轮/.test(d.getElementById('round-badge').textContent), d.getElementById('round-badge').textContent);
   t('进入聊天后提示条收起', w.getComputedStyle(d.getElementById('draft-bar')).display === 'none');
   const memState = w.eval('JSON.stringify({roundCount: state.roundCount, owner: state.interviewee.owner, msgs: state.messages.length})');
   const ms = JSON.parse(memState);
-  t('内存 state 轮次同步', ms.roundCount === 3, String(ms.roundCount));
+  t('内存 state 轮次同步', ms.roundCount === 6, String(ms.roundCount));
   t('内存 state 对接人同步', ms.owner === '王珍', ms.owner);
-  t('内存 state 消息与草稿一致', ms.msgs === 9, String(ms.msgs));
+  t('内存 state 消息与草稿一致', ms.msgs === 15, String(ms.msgs));
   dom.window.close();
 
   /* ══════════════ 场景 C：报告已生成后断线 ══════════════ */
@@ -197,7 +214,7 @@ const settle = (ms = 250) => new Promise(r => setTimeout(r, ms));
   w = dom.window; d = w.document;
   await w.resumeDraft();
   await settle();
-  // 3 轮素材达不到信息量门槛，此时点「生成报告」应先出提示面板而不是直接出报告。
+  // 6 轮素材过了硬闸但达不到信息量门槛，此时点「生成报告」应先出提示面板而不是直接出报告。
   // 旧测试直接调 endAndReport() 期望出报告，这里改为走「仍要生成报告」按钮的真实路径。
   await w.endAndReport();
   await settle(60);
