@@ -179,7 +179,10 @@ console.log('\n[5] 新旧格式兼容');
     '旧格式末节「新人注意事项」按别名归一到「新人容易踩的坑」');
 
   const plainNew = plainOf(HTML_NEW);
-  ok(plainNew.includes('具体怎么做'), '新格式的「具体怎么做：」渲染成二级小标题');
+  /* 2026-10-10 P0：「具体怎么做：」不再输出孤行小标题，改为开启字段组（rpt-how），
+     其下的字段行收进带左边线的组里。孤行文本不应再出现在输出中。 */
+  ok(HTML_NEW.includes('class="rpt-how"'), '新格式的「具体怎么做：」开启字段组（不再输出孤行）');
+  ok(!plainNew.includes('具体怎么做'), '「具体怎么做」孤行文本不再出现');
   ok((HTML_NEW.match(/class="rpt-k"/g) || []).length > 0, '行内「键：值」的键有高亮标签');
   ok((HTML_NEW.match(/class="rpt-li"/g) || []).length >= 6, '编号行渲染成条目');
 

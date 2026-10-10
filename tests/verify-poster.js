@@ -138,9 +138,82 @@ ok('邮件版也走一图流', flowEmail.includes('fv-page') && !flowEmail.inclu
 ok('邮件版一图流不含 DOCTYPE', !flowEmail.includes('<!DOCTYPE'));
 
 fs.writeFileSync(path.join(__dirname, 'tmp', 'poster-flow.html'), flowHtml);
-console.log('\n产物：tests/tmp/poster-r9.html / poster-email-r9.html / poster-flow.html');
 
-process.exit(fail ? 1 : 0);
+console.log('\n[10] 完整版 P0：层级与空值兜底（rptBody）');
+const PH = '（访谈中未留下原话）';
+const st10 = { uncovered: 0 };
+const r10 = poster.rptBody(
+  '做法：留号回访\n' +
+  '原话：『我就是上个月几号，平安融易的谁谁谁』\n' +
+  PH + '\n' +
+  '- 频次/时机：基本一个月左右跟进一次\n' +
+  '- 载体/工具：' + PH + '\n' +
+  '具体怎么做：\n' +
+  '- 触发信号：客户在电话里说"暂时不需要"\n',
+  st10, '可复制的经验点'
+);
+ok('整行占位符不渲染', !r10.html.includes('访谈中未留下原话'));
+ok('整行占位符计数（2 处：整行 + 值）', st10.uncovered === 2, st10.uncovered);
+ok('返回值 uncovered 与 stat 一致', r10.uncovered === 2, r10.uncovered);
+ok('「原话：」→ 引用样式 rpt-quote', r10.html.includes('class="rpt-quote"'));
+ok('引用内容已转义且带『』原文', r10.html.includes('我就是上个月几号'));
+ok('字段行 → 两列结构 rpt-kv/rpt-k/rpt-kv-t',
+   r10.html.includes('rpt-kv') && r10.html.includes('rpt-k') && r10.html.includes('rpt-kv-t'));
+ok('字段值折行处 <br/> 自闭合（XML 安全）', !r10.html.includes('<br>'));
+ok('「具体怎么做：」不再输出孤行', !r10.html.includes('具体怎么做'));
+ok('「具体怎么做：」开启字段组 rpt-how', r10.html.includes('class="rpt-how"'));
+ok('「做法：」→ 徽章行 rpt-doing', r10.html.includes('rpt-doing'));
+ok('空正文兜底', poster.rptBody('', { uncovered: 0 }, '结果').html.includes('rpt-empty'));
 
+/* 带列表符的形态（模型输出常见）：正则判定发生在剥列表符之前，必须自己容忍前缀 */
+const stList = { uncovered: 0 };
+const rList = poster.rptBody(
+  '- 原话：『探针原话行』\n- 具体怎么做：\n- 触发信号：探针信号\n',
+  stList, '可复制的经验点'
+);
+ok('「- 原话：」也走引用样式', rList.html.includes('class="rpt-quote"'));
+ok('「- 具体怎么做：」也开启字段组（不出孤行）',
+   rList.html.includes('class="rpt-how"') && !rList.html.includes('具体怎么做'));
+
+const stRj = { uncovered: 0 };
+const rRj = poster.rptBody(
+  '- 可选走法：A 当场继续推产品；B 留号回访\n' +
+  '- 选择依据：客户没有当下资金需求\n' +
+  '- 被否掉的那条路为什么不行：一味紧逼会让客户觉得为了推销而推销\n',
+  stRj, '关键判断与取舍'
+);
+ok('「被否…」→ rpt-reject', rRj.html.includes('rpt-reject'));
+ok('被否标签简写为「被否的路」', rRj.html.includes('被否的路'));
+ok('被否行带 ✕ 标记 rpt-x', rRj.html.includes('rpt-x') && rRj.html.includes('✕'));
+ok('非被否键不带 ✕', (rRj.html.match(/rpt-x/g) || []).length === 1, (rRj.html.match(/rpt-x/g) || []).length);
+ok('其他节的「被否」键不触发 reject（键表不含）',
+   !poster.rptBody('- 被否掉的那条路：x\n', { uncovered: 0 }, '结果').html.includes('rpt-reject'));
+
+console.log('\n[11] 完整版 P0：标题取钩子句 + 节尾未覆盖汇总（renderFullMarkup）');
+/* 给第一个分隔符前的节（背景与挑战）末尾注入占位符，验证节尾汇总 */
+const fullRaw = flowRaw.replace('\n---SECTION---\n', '\n' + PH + '\n---SECTION---\n');
+const fullHtml = poster.renderFullMarkup(fullRaw, meta);
+fs.writeFileSync(path.join(__dirname, 'tmp', 'poster-full.html'), fullHtml);
+ok('标题用钩子句而非主题原文', fullHtml.includes('额度不大的老客户') && fullHtml.includes('rpt-title'));
+ok('钩子数字带高亮 rpt-hl', fullHtml.includes('rpt-hl') && fullHtml.includes('100万'));
+ok('钩子句生效时输出「案例主题」副行', fullHtml.includes('案例主题') && fullHtml.includes('老客户转介绍'));
+ok('节尾未覆盖汇总行', fullHtml.includes('rpt-uncovered') && fullHtml.includes('访谈中未覆盖'));
+ok('完整版不含「海报摘要」节', !fullHtml.includes('海报摘要'));
+ok('无钩子句的老数据回退主题原文', poster.renderFullMarkup(raw, meta).includes('老客户转介绍'));
+
+console.log('\n[12] 完整版 P0：CSS 存在且关键值正确（样式内嵌在 fullHtml 的 <style> 里）');
+const css = fullHtml;
+ok('.rpt-k-col 固定列宽 168px', /\.rpt-page \.rpt-k-col \{[^}]*width:168px/.test(css));
+ok('.rpt-k 不折行（长标签「对方没反应时怎么办」）',
+   /\.rpt-page \.rpt-k \{[^}]*white-space:nowrap/.test(css));
+ok('.rpt-quote 引用样式存在', /\.rpt-page \.rpt-quote/.test(css));
+ok('.rpt-how 字段组存在', /\.rpt-page \.rpt-how/.test(css));
+ok('.rpt-reject 灰化存在', /\.rpt-page \.rpt-reject/.test(css));
+ok('.rpt-x ✕ 标记存在', /\.rpt-page \.rpt-x/.test(css));
+ok('.rpt-uncovered 汇总行存在', /\.rpt-page \.rpt-uncovered/.test(css));
+ok('.rpt-topic 案例主题副行存在', /\.rpt-page \.rpt-topic/.test(css));
+ok('.rpt-hl 数字高亮存在', /\.rpt-page \.rpt-title \.rpt-hl|\.rpt-hl/.test(css));
+
+console.log('\n产物：tests/tmp/poster-r9.html / poster-email-r9.html / poster-flow.html / poster-full.html');
 console.log('\n' + (fail ? '✗ ' + fail + ' 项失败' : '✓ 全部通过'));
 process.exit(fail ? 1 : 0);

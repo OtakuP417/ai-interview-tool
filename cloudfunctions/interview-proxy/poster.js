@@ -814,16 +814,55 @@ const FULL_W = 1080;
 /* 编号行 / 项目符号行 */
 const RPT_LIST_RE = /^\s*(?:(\d{1,2})\s*[.、）)]|[-*•])\s*(.+)$/;
 /* 「具体怎么做：」这类小标题行（新格式的二级结构） */
-const RPT_SUB_RE = /^(?:\*{0,2}|【)?\s*(?:具体怎么做|具体做法|怎么做)\s*(?:\*{0,2}|】)?\s*[:：]?\s*$/;
+/* 模型输出常带列表符（「- 具体怎么做：」），这两个判定发生在剥列表符之前，
+   所以前缀要自己容忍 —— 否则「- 原话：」会掉进键值分支、「- 具体怎么做：」
+   会掉进编号项分支，各自渲染成不该有的样子。 */
+const RPT_SUB_RE = /^(?:[-*•]|\d+[.、])?\s*(?:\*{0,2}|【)?\s*(?:具体怎么做|具体做法|怎么做)\s*(?:\*{0,2}|】)?\s*[:：]?\s*$/;
 /* 「做法：…」引导行 */
 const RPT_LEAD_RE = /^(?:\*{0,2}|【)?\s*做法\s*(?:\*{0,2}|】)?\s*[:：]\s*(.+)$/;
 /* 行内「键：值」 */
-const RPT_KV_RE = /^([^:：]{2,12})[:：]\s*(.+)$/;
+const RPT_KV_RE = /^([^:：]{2,20})[:：]\s*(.+)$/;
+/* 「原话：…」引用行（必须先于键值判断，否则「原话」会被当成普通键） */
+const RPT_QUOTE_RE = /^(?:[-*•]|\d+[.、])?\s*(?:\*{0,2}|【)?\s*原话\s*(?:\*{0,2}|】)?\s*[:：]\s*(.+)$/;
 
 /* 只有这些键才值得标出来（与 web/index.html 的 METHOD_KEY_RE 同一张表）。
    不能见冒号就标 —— 详细版是给人通读的全文，把任意冒号前的短语
    都染成橙色只会让人以为那是重点。 */
 const RPT_METHOD_KEY_RE = /^(?:对方没反应时怎么办|频次|时机|周期|话术|方法|载体|工具|渠道|对方反应|客户反应|注意|要点|条件|判断|标准|备注|示例)(?:\/(?:时机|方法|工具|周期|反应|怎么办|途径|事项|依据))*\s*[:：]/;
+
+/* 各节自己的重点字段。经验点/关键判断的字段表和核心做法不同，
+   一张全局表两头不讨好 —— 经验点的「触发信号/失效边界」、
+   关键判断的「可选走法/被否的路」都是各自方法论的一部分，漏了哪个
+   哪个就埋进正文里。 */
+const RPT_SECTION_KEYS = {
+  "可复制的经验点":
+    /^(?:频次|时机|周期|话术|方法|载体|工具|渠道|对方没反应时怎么办|对方反应|客户反应|触发信号|失效边界|注意|要点|条件|示例)/,
+  "关键判断与取舍":
+    /^(?:可选走法|选择依据|被否掉的那条路为什么不行|被否的原因|判断依据|判断标准)/,
+  "结果":
+    /^(?:团队参照|本单结果|结果)/,
+};
+
+/* 超长键换成短标签，否则固定宽度的标签列装不下 */
+const RPT_KEY_LABEL = {
+  "被否掉的那条路为什么不行": "被否的路",
+};
+
+/* ── 占位符识别 ──
+   报告里的「（未提到失效边界）」「（访谈中未展开）」这类诚实兜底，
+   内容上是零信息，渲染上却和真内容平级 —— 实测 #19 一份就有 13 行，
+   占全文近 1/4，是长图最大的噪音源。
+   这里只在「整段值就是一个占位符」时跳过；占位符后面还跟着真实内容的
+   （如「（他没提到其他走法，实际是把打压和先用结清两步连用）」）照常渲染。
+   跳过的条数在节尾汇总成一行，保住「访谈没问到」这个事实，但不让它刷屏。 */
+const RPT_PH_INNER_RE =
+  /^(?:访谈中|当时|现场)?(?:他|她|它|对方)?(?:都|也)?(?:未|没|没有|没怎么|不太|不)[^，。；、！？"'『』（）()]{0,18}$/;
+
+function rptIsPlaceholder(v) {
+  const t = String(v || "").trim();
+  const m = t.match(/^[（(]([^（）()]*)[）)]$/);
+  return !!(m && m[1].length <= 24 && RPT_PH_INNER_RE.test(m[1]));
+}
 
 /* 行内「键：值」把方法键标出来，其余原样输出 */
 function rptInline(s) {
@@ -835,14 +874,43 @@ function rptInline(s) {
 
 /**
  * 通用正文渲染：不截断。
- *   编号行 / 项目符号行 → 一条一条列出来
- *   「具体怎么做：」      → 二级小标题
- *   「做法：…」          → 也算一条（新格式没有行首序号）
- *   其余连续行            → 合成一个段落（段内软换行保留）
+ *
+ * 层级处理（这次改动的核心）——萃取内容有三种价值密度：
+ *   A 能直接照着说的话术/动作（最高）  B 判断标准  C 兜底说明（最低）
+ * 旧版三者视觉权重一样，读者扫不出该背哪句。这里把层级做进结构：
+ *   · 「做法：」「1. xxx：」  → 标题级（加粗）
+ *   · 「原话：…」             → 引用样式（浅橙底 + 左边框）
+ *   · 「频次/时机：…」等字段   → 两列（标签列固定宽，内容折行对齐到内容列）
+ *   · 「（未提到失效边界）」等  → 不渲染，节尾汇总一行
+ *   · 「具体怎么做：」孤行     → 不再输出，改为把字段收进带左边线的组
+ *
+ * @param {string} text      节正文
+ * @param {object} stat      {uncovered:n} 累计本节被跳过的占位符条数（调用方传入）
+ * @param {string} canonical 节的标准名（决定用哪张字段键表、是否加粗编号项）
  */
-function rptBody(text) {
+function rptBody(text, stat, canonical) {
   const out = [];
+  const st = stat && typeof stat === "object" ? stat : { uncovered: 0 };
   let para = [];
+  let howOpen = false;
+
+  const keysRe = RPT_SECTION_KEYS[canonical] || null;
+  /* 核心做法 / 关键判断的编号项是「这一步 / 这个判断」的标题，值得加粗；
+     结果、背景等节的编号项是普通列举，加粗反而处处是重点。 */
+  const boldItems = canonical === "核心做法" || canonical === "关键判断与取舍";
+
+  function closeHow() {
+    if (howOpen) {
+      out.push("</div>");
+      howOpen = false;
+    }
+  }
+  function openHow() {
+    if (!howOpen) {
+      out.push('<div class="rpt-how">');
+      howOpen = true;
+    }
+  }
   const flush = function () {
     if (!para.length) return;
     /* <br/> 必须自闭合：这段 markup 会被前端拼进 SVG foreignObject，
@@ -854,42 +922,108 @@ function rptBody(text) {
 
   String(text || "").replace(/\r/g, "").split("\n").forEach(function (raw) {
     const line = raw.trim();
-    if (!line) { flush(); return; }
+    if (!line) {
+      flush();
+      return;
+    }
 
+    /* 整行就是一个占位符（如「（访谈中未留下原话）」）→ 跳过并计数 */
+    if (rptIsPlaceholder(line)) {
+      st.uncovered += 1;
+      return;
+    }
+
+    /* 「原话：…」→ 引用样式。必须先于键值判断，否则「原话」会被当成普通键 */
+    const qm = line.match(RPT_QUOTE_RE);
+    if (qm) {
+      flush();
+      closeHow();
+      out.push('<p class="rpt-quote">' + esc(qm[1]) + "</p>");
+      return;
+    }
+
+    /* 「具体怎么做：」→ 不输出孤行小标题，改为开启一个字段组 */
     if (RPT_SUB_RE.test(line)) {
       flush();
-      out.push('<div class="rpt-sub">具体怎么做</div>');
+      closeHow();
+      openHow();
       return;
     }
 
+    /* 先剥列表标记，再判断是不是结构化「键：值」行 ——
+       「- 失效边界：…」的键位里带着列表符，不剥会导致键匹配不上 */
     const lm = line.match(RPT_LIST_RE);
+    const content = lm ? lm[2].trim() : line;
+    const num = lm ? lm[1] || "" : "";
+
+    const kv = content.match(RPT_KV_RE);
+    const isKeyed =
+      kv &&
+      ((keysRe && keysRe.test(kv[1])) || RPT_METHOD_KEY_RE.test(content));
+
+    if (isKeyed) {
+      flush();
+      /* 值是纯占位符 → 跳过并计数（「被否的路：（他没提到其他走法）」这类） */
+      if (rptIsPlaceholder(kv[2])) {
+        st.uncovered += 1;
+        return;
+      }
+      const label = RPT_KEY_LABEL[kv[1]] || kv[1];
+      const reject = canonical === "关键判断与取舍" && /被否/.test(kv[1]);
+      openHow();
+      out.push(
+        '<div class="rpt-li' + (reject ? " rpt-reject" : "") + '">' +
+          '<span class="rpt-li-n bare"></span>' +
+          '<div class="rpt-kv"><span class="rpt-k-col"><span class="rpt-k">' +
+          (reject ? '<i class="rpt-x">✕</i>' : "") + esc(label) + "</span></span>" +
+          '<div class="rpt-kv-t">' + esc(kv[2]) + "</div></div></div>"
+      );
+      return;
+    }
+
     if (lm) {
       flush();
-      const num = lm[1] || "";
+      closeHow();
+      let inner = rptInline(content);
+      if (boldItems) {
+        const hm = content.match(/^([^：:]{2,16})[：:]\s*(.+)$/);
+        if (hm && !RPT_METHOD_KEY_RE.test(content)) {
+          inner = '<b class="rpt-li-k">' + esc(hm[1]) + "：</b>" + esc(hm[2]);
+        } else if (!hm && content.length <= 26) {
+          /* 没有冒号的短编号项（如「名单往哪个方向筛」）本身就是标题 */
+          inner = '<b class="rpt-li-k">' + esc(content) + "</b>";
+        }
+      }
       out.push(
         '<div class="rpt-li">' +
-        '<span class="rpt-li-n' + (num ? "" : " bare") + '">' + esc(num) + "</span>" +
-        '<div class="rpt-li-t">' + rptInline(lm[2]) + "</div>" +
-        "</div>"
+          '<span class="rpt-li-n' + (num ? "" : " bare") + '">' + esc(num) + "</span>" +
+          '<div class="rpt-li-t">' + inner + "</div></div>"
       );
       return;
     }
 
-    const em = line.match(RPT_LEAD_RE);
+    const em = content.match(RPT_LEAD_RE);
     if (em) {
       flush();
+      closeHow();
       out.push(
-        '<div class="rpt-li"><span class="rpt-li-n bare"></span>' +
-        '<div class="rpt-li-t"><span class="rpt-lead">做法</span>' + esc(em[1]) + "</div></div>"
+        '<div class="rpt-li rpt-doing"><span class="rpt-li-n bare"></span>' +
+          '<div class="rpt-li-t"><span class="rpt-lead">做法</span>' +
+          esc(em[1]) + "</div></div>"
       );
       return;
     }
 
+    closeHow();
     para.push(rptInline(line));
   });
   flush();
+  closeHow();
 
-  return out.join("") || '<p class="rpt-p rpt-empty">（本节内容为空）</p>';
+  return {
+    html: out.join("") || '<p class="rpt-p rpt-empty">（本节内容为空）</p>',
+    uncovered: st.uncovered,
+  };
 }
 
 /* 章节标题：以报告原文首行为准做别名归一，取不到就用标准名 */
@@ -910,6 +1044,21 @@ function renderFullMarkup(raw, meta) {
   const position = String(m.position || "").trim();
   const um = String(m.um || "").trim();
 
+  /* 完整版标题与一图流用同一句钩子 —— 同一条数据的两张图，标题力度
+     不该差一个量级（一图流是「只打3次电话，一个月转成几十万」，
+     完整版却只是顾问手填的「转化率高」）。老数据没有「海报摘要」节
+     或钩子句为空时，回退到主题原文。 */
+  const ps = parsePosterSummary(raw);
+  let titleHtml = ps && ps.hookParts && ps.hookParts.length
+    ? ps.hookParts.map(function (p) {
+        return p.t === "num"
+          ? '<span class="rpt-hl">' + esc(p.s) + "</span>"
+          : esc(p.s);
+      }).join("")
+    : "";
+  const titleIsHook = !!titleHtml.trim();
+  if (!titleIsHook) titleHtml = esc(m.topic || "案例经验报告");
+
   /* 六节全文。「海报摘要」是给一图流用的内部数据（键值行），
      在给人读的详细版里只会显得莫名其妙，所以排除。 */
   let n = 0;
@@ -919,12 +1068,21 @@ function renderFullMarkup(raw, meta) {
     n += 1;
     const body = sec[canonical] || "";
     const title = rptSectionTitle(canonical, body);
+    const stat = { uncovered: 0 };
+    const rendered = rptBody(body, stat, canonical);
+    /* 被跳过的占位符在节尾汇总成一行 —— 「访谈没问到」这个事实要保住
+       （培训的人得知道下次该补问什么），但不让它一行一行刷屏。 */
+    const uncovered =
+      stat.uncovered > 0
+        ? '<div class="rpt-uncovered">本节有 ' + stat.uncovered +
+          " 处内容访谈中未覆盖，详见对话记录</div>"
+        : "";
     return '<section class="rpt-sec">' +
       '<div class="rpt-sec-h">' +
       '<span class="rpt-sec-n">' + n + "</span>" +
       '<span class="rpt-sec-t">' + esc(title) + "</span>" +
       "</div>" +
-      '<div class="rpt-sec-b">' + rptBody(body) + "</div>" +
+      '<div class="rpt-sec-b">' + rendered.html + uncovered + "</div>" +
       "</section>";
   }).join("");
 
@@ -974,6 +1132,8 @@ function renderFullMarkup(raw, meta) {
     font-size:40px; line-height:1.3; font-weight:500;
     letter-spacing:-0.5px; color:${FLOW.TXT};
   }
+  .rpt-page .rpt-title .rpt-hl { color:${FLOW.ORANGE}; font-weight:600; }
+  .rpt-page .rpt-topic { margin-top:13px; font-size:15.5px; color:${FLOW.TXT_3}; letter-spacing:.2px; }
   .rpt-page .rpt-meta {
     margin-top:16px; font-size:17px; color:${FLOW.TXT_2}; line-height:1.6;
   }
@@ -1018,17 +1178,65 @@ function renderFullMarkup(raw, meta) {
   .rpt-page .rpt-li-n.bare { width:9px; height:9px; border:0; margin-top:12px;
     background:${FLOW.ORANGE_L}; }
   .rpt-page .rpt-li-t { flex:1; min-width:0; font-size:17.5px; line-height:1.85; color:#3D3129; }
+
+  /* 「做法：…」是经验点小节的标题，加粗放大让它和后面的字段拉开 */
+  .rpt-page .rpt-doing .rpt-li-t { font-size:18.5px; font-weight:600; color:${FLOW.TXT}; line-height:1.7; }
+  .rpt-page .rpt-doing .rpt-lead {
+    background:${FLOW.ORANGE}; border-color:${FLOW.ORANGE}; color:#fff; font-weight:500;
+  }
+  /* 核心做法 / 关键判断的编号项标题（「名单来源与筛选标准：」） */
+  .rpt-page .rpt-li-k { font-weight:600; color:${FLOW.TXT}; }
+
+  /* 「具体怎么做」字段组：不再输出孤行小标题，改用左边线把字段收进
+     它们所属的那条「做法」下面。缩进量 = 圆点(9px) + 间距(12px)，
+     正好对齐到做法文字的起点。 */
+  .rpt-page .rpt-how {
+    margin:2px 0 16px 21px; padding-left:2px;
+    border-left:2px solid ${FLOW.LINE};
+  }
+  .rpt-page .rpt-how .rpt-li { margin-bottom:9px; }
+  .rpt-page .rpt-how .rpt-li:last-child { margin-bottom:0; }
+
+  /* 字段两列：标签列固定宽（内容折行对齐到内容列，不再顶回页边），
+     chip 本身按内容自适应宽度 —— 「频次/时机」不用撑满一整列。 */
+  .rpt-page .rpt-kv { display:flex; gap:0; align-items:flex-start; }
+  .rpt-page .rpt-k-col { flex-shrink:0; width:168px; }
+  .rpt-page .rpt-k {
+    display:inline-block; color:${FLOW.ORANGE_D}; font-weight:500;
+    background:${FLOW.BG_TINT}; border:1px solid ${FLOW.LINE_2};
+    border-radius:4px; padding:0 6px; margin-right:14px;
+    font-size:15px; line-height:1.75; letter-spacing:.2px;
+    white-space:nowrap;
+  }
+  .rpt-page .rpt-kv-t { flex:1; min-width:0; font-size:17px; line-height:1.85; color:#3D3129; }
+
+  /* 「被否的那条路」—— 这套方法论里最有教学价值的部分。
+     用灰 + ✕ 标记「不走这条路」；不用删除线，两行长句划线反而难读。 */
+  .rpt-page .rpt-reject .rpt-k { background:transparent; border-color:transparent;
+    color:${FLOW.TXT_3}; font-weight:500; }
+  .rpt-page .rpt-reject .rpt-kv-t { color:${FLOW.TXT_3}; }
+  .rpt-page .rpt-x {
+    display:inline-block; font-style:normal; color:${FLOW.ORANGE_L};
+    font-size:13px; font-weight:600; margin-right:4px; transform:translateY(-1px);
+  }
+
+  /* 「原话：…」引用：浅橙底 + 左边框，把能直接抄走用的话术从正文里浮出来 */
+  .rpt-page .rpt-quote {
+    margin:2px 0 13px 21px; padding:9px 16px;
+    background:${FLOW.BG_TINT}; border-left:3px solid ${FLOW.ORANGE_L};
+    border-radius:0 6px 6px 0;
+    font-size:16.5px; line-height:1.8; color:#5A4638;
+  }
+
+  /* 被跳过的占位符在节尾汇总 —— 保住「访谈没覆盖」这个事实，但不刷屏 */
+  .rpt-page .rpt-uncovered {
+    margin-top:14px; font-size:14px; color:${FLOW.TXT_3}; line-height:1.7;
+  }
   .rpt-page .rpt-sub {
     font-size:15px; font-weight:500; color:${FLOW.ORANGE_D};
     margin:14px 0 9px 37px; letter-spacing:.3px;
   }
   .rpt-page .rpt-sub + .rpt-li { margin-top:0; }
-  .rpt-page .rpt-k {
-    display:inline-block; color:${FLOW.ORANGE_D}; font-weight:500;
-    background:${FLOW.BG_TINT}; border:1px solid ${FLOW.LINE_2};
-    border-radius:4px; padding:0 6px; margin-right:7px;
-    font-size:15.5px; line-height:1.75;
-  }
   .rpt-page .rpt-lead {
     display:inline-block; color:${FLOW.ORANGE_D}; font-weight:500;
     background:${FLOW.BG_TINT}; border:1px solid ${FLOW.LINE_2};
@@ -1063,7 +1271,12 @@ function renderFullMarkup(raw, meta) {
       <div class="rpt-hd-r">${date ? esc(date) : ""}</div>
     </div>
 
-    <div class="rpt-title">${esc(m.topic || "案例经验报告")}</div>
+    <div class="rpt-title">${titleHtml}</div>
+    ${
+      titleIsHook && m.topic
+        ? '<div class="rpt-topic">案例主题：' + esc(m.topic) + "</div>"
+        : ""
+    }
 
     <div class="rpt-meta">${metaBits.join('<span class="rpt-sep"></span>')}</div>
     ${
