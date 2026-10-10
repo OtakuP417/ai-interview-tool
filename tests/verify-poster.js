@@ -214,6 +214,57 @@ ok('.rpt-uncovered 汇总行存在', /\.rpt-page \.rpt-uncovered/.test(css));
 ok('.rpt-topic 案例主题副行存在', /\.rpt-page \.rpt-topic/.test(css));
 ok('.rpt-hl 数字高亮存在', /\.rpt-page \.rpt-title \.rpt-hl|\.rpt-hl/.test(css));
 
+console.log('\n[13] 一图流 P1：例提权 / 行间等宽 / 判断句两段');
+/* 例：引用块待遇（浅橙底 + 左边线），不再是一行灰字 */
+ok('「例」块带浅橙底', /\.fv-act-x \{[^}]*background:\$\{FLOW\.BG_TINT\}|\.fv-act-x \{[^}]*background:#FFF6EF/.test(flowHtml.replace('${FLOW.BG_TINT}', '#FFF6EF')));
+ok('「例」块带左侧橙边线', /\.fv-act-x \{[^}]*border-left:3px solid/.test(flowHtml));
+ok('「例」徽章是实心橙底白字', /\.fv-q \{[^}]*color:#fff[^}]*background:#EA5504|\.fv-q \{[^}]*background:#EA5504/.test(flowHtml));
+ok('「例」文本有独立容器 fv-act-x-t', /<span class="fv-act-x-t">/.test(flowHtml));
+
+/* 行间等宽：精确构造 N 条做法的摘要（不要用 replace 复制行 —— 同编号会互相覆盖；
+   另注意做法条数上限 8 条，超过会被截） */
+function flowWithActions(n) {
+  const lines = ['钩子句：测出100万', '成果1：100万|单笔放款', '判断句：甲做法——乙原因', '避坑句：丙坑位'];
+  for (let i = 1; i <= n; i++) {
+    lines.push('做法' + i + '标题：标题' + i);
+    lines.push('做法' + i + '做法：内容' + i);
+    lines.push('做法' + i + '示例：示例' + i);
+  }
+  return raw + '\n---SECTION---\n海报摘要\n' + lines.join('\n');
+}
+/* 只取「做法行」的列数（成果卡也是 grid，且只有 1 格时是 repeat(1,1fr)，别混进来） */
+function actCols(html) {
+  return (html.match(/class="fv-act-row" style="grid-template-columns:repeat\((\d+),1fr\)/g) || [])
+    .map(s => +s.match(/repeat\((\d+)/)[1]);
+}
+const f7 = poster.renderFlowMarkup(flowWithActions(7), meta);
+ok('「4+3」两行都用 4 列（卡宽不跳变）',
+   actCols(f7).join(',') === '4,4', actCols(f7).join(','));
+const f5 = poster.renderFlowMarkup(flowWithActions(5), meta);
+ok('「3+2」两行都用 3 列（末行右侧留白，不撑宽）',
+   actCols(f5).join(',') === '3,3', actCols(f5).join(','));
+ok('末行不足时不补空卡（只有真实卡片）',
+   (f5.match(/class="fv-act"/g) || []).length === 5,
+   (f5.match(/class="fv-act"/g) || []).length);
+const f3 = poster.renderFlowMarkup(flowWithActions(3), meta);
+ok('单行 3 条仍是 3 列（未过度放大）',
+   actCols(f3).join(',') === '3', actCols(f3).join(','));
+const f8 = poster.renderFlowMarkup(flowWithActions(8), meta);
+ok('8 条 = 上限，两行各 4 列（原本 8 条会变成 4+4）',
+   actCols(f8).join(',') === '4,4', actCols(f8).join(','));
+
+/* 判断句：「被否的做法——为什么不行」两段分开 */
+const flowJudge = poster.renderFlowMarkup(
+  flowRaw.replace(/判断句：[^\n]*/, '判断句：先啃老客户、不扫新名单——陌拜一天十条搭上话不到两个'),
+  meta
+);
+ok('判断句前半包 fv-neg（被否的路）', /class="fv-neg"/.test(flowJudge));
+ok('判断句前半带 ✕ 标记', /<i class="fv-x">✕<\/i>/.test(flowJudge));
+ok('判断句后半包 fv-ok（选择依据）', /class="fv-ok"/.test(flowJudge));
+ok('被否段在前、依据段在后', flowJudge.indexOf('先啃老客户') < flowJudge.indexOf('陌拜一天十条'));
+ok('两段之间补回「——」分隔（CSS ::before）', /\.fv-ok::before \{ content:'——'/.test(flowJudge));
+ok('无「——」的判断句不硬拆', !/class="fv-neg"/.test(flowHtml));
+
 console.log('\n产物：tests/tmp/poster-r9.html / poster-email-r9.html / poster-flow.html / poster-full.html');
 console.log('\n' + (fail ? '✗ ' + fail + ' 项失败' : '✓ 全部通过'));
 process.exit(fail ? 1 : 0);

@@ -433,12 +433,16 @@ function renderFlowMarkup(raw, meta) {
   const plan = flowPlanActions(acts.length);
   const hp = flowPlanHeights(acts.length);
   const twoRow = plan.rows.length > 1;
-  const colCount = plan.cols;
+  /* 统一列数 = 各行里最多的条数（不是 plan.cols）。
+     用 plan.cols 会让「3+3+3」这种行各自只填满 3/4 宽度；
+     用每行自身条数会让「4+3」两行卡宽跳变。取最大值两头都躲开，
+     末行不足时右侧留白 —— 一致性比塞满重要。 */
+  const colCount = plan.rows.reduce((m, r) => Math.max(m, r.length), 1);
 
   let titleSize, descSize, exSize;
-  if (twoRow) { titleSize = 20; descSize = 13.5; exSize = 12.5; }
-  else if (colCount <= 3) { titleSize = 25; descSize = 15.5; exSize = 14; }
-  else { titleSize = 23; descSize = 15; exSize = 13.5; }
+  if (twoRow) { titleSize = 20; descSize = 13.5; exSize = 13; }
+  else if (colCount <= 3) { titleSize = 25; descSize = 15.5; exSize = 14.5; }
+  else { titleSize = 23; descSize = 15; exSize = 14; }
 
   const dLim = flowDescLimit(colCount, twoRow);
   const xLim = flowExLimit(colCount, twoRow);
@@ -465,13 +469,16 @@ function renderFlowMarkup(raw, meta) {
         <div class="fv-act-n">${i + 1}</div>
         <div class="fv-act-t">${esc(clip(a.t, 12))}</div>
         <div class="fv-act-d">${esc(clip(a.d, dLim))}</div>
-        ${a.x ? '<div class="fv-act-x"><span class="fv-q">例</span>' + esc(clip(a.x, xLim)) + "</div>" : ""}
+        ${a.x ? '<div class="fv-act-x"><span class="fv-q">例</span><span class="fv-act-x-t">' + esc(clip(a.x, xLim)) + "</span></div>" : ""}
       </div>`;
 
+  /* 每行都用同一个列数（而不是各按自身条数）——
+     否则「4 张 + 3 张」两行的列宽不同，同一张图里卡宽跳变，扫读节奏就断了。
+     末行不足时右侧留白，比宽度不一致好。 */
   const rowHtml = plan.rows
     .map(
       (r) =>
-        `<div class="fv-act-row" style="grid-template-columns:repeat(${r.length},1fr)">${
+        `<div class="fv-act-row" style="grid-template-columns:repeat(${colCount},1fr)">${
           r.map((i) => (acts[i] ? cardHtml(acts[i], i) : "")).join("")
         }</div>`
     )
@@ -486,6 +493,19 @@ function renderFlowMarkup(raw, meta) {
       </div>`
     )
     .join("");
+
+  /* 判断句形如「被否的做法——为什么不行」（生成端规则如此）。
+     前半是被否掉的那条路，加 ✕ 并压灰；后半是选择依据，正常字重。
+     这正是这套方法论里最有教学价值的一句，不该糊成一片。 */
+  const judgeHtml = (t) => {
+    const s = String(t || "");
+    const i = s.indexOf("——");
+    if (i < 0) return esc(s);
+    return (
+      '<span class="fv-neg"><i class="fv-x">✕</i>' + esc(s.slice(0, i)) + "</span>" +
+      '<span class="fv-ok">' + esc(s.slice(i + 2).replace(/^[，,、\s]+/, "")) + "</span>"
+    );
+  };
 
   return `<style>
   /* 一图流自带样式重置：不注入 POSTER_CSS（那是六节版的），
@@ -574,15 +594,21 @@ function renderFlowMarkup(raw, meta) {
   }
   .fv-act-t { font-size:${titleSize}px; font-weight:500; color:${FLOW.TXT}; letter-spacing:.2px; }
   .fv-act-d { font-size:${descSize}px; line-height:1.7; color:${FLOW.TXT_2}; margin-top:8px; }
+  /* 「例」——他原话怎么说的。这是全卡最能直接抄走用的一句，
+     所以给引用块待遇（浅橙底 + 左边线 + 深色字），而不是压在灰色小字里。 */
   .fv-act-x {
-    font-size:${exSize}px; line-height:1.62; color:#6B5646;
-    margin-top:10px; padding-top:9px; border-top:1px dashed ${FLOW.LINE_2};
+    display:flex; align-items:flex-start; gap:7px;
+    font-size:${exSize}px; line-height:1.6; color:#3D3129;
+    margin-top:11px; padding:8px 11px;
+    background:${FLOW.BG_TINT};
+    border-left:3px solid ${FLOW.ORANGE_L};
+    border-radius:0 6px 6px 0;
   }
+  .fv-act-x-t { flex:1; min-width:0; }
   .fv-q {
-    display:inline-block; font-size:${exSize - 1.5}px; color:${FLOW.ORANGE_D};
-    border:1px solid ${FLOW.LINE_2}; background:${FLOW.BG_TINT};
-    border-radius:3px; padding:0 4px; margin-right:5px;
-    vertical-align:1px; font-weight:500;
+    flex-shrink:0; font-size:${exSize - 1.5}px; color:#fff;
+    background:${FLOW.ORANGE}; border-radius:3px;
+    padding:0 4px; margin-top:1px; line-height:1.5; font-weight:500;
   }
 
   .fv-foot { display:grid; grid-template-columns:1.35fr 1fr; gap:13px; margin-top:20px; flex-shrink:0; }
@@ -597,6 +623,15 @@ function renderFlowMarkup(raw, meta) {
   .fv-fbox.judge .fv-fh { color:${FLOW.ORANGE_D}; }
   .fv-fbox.judge .fv-fh .fv-mark { background:${FLOW.ORANGE}; }
   .fv-fbox.judge .fv-ft { color:#463127; }
+  /* 判断句里「被否的做法——为什么不行」两段要分开看：
+     前半是被否掉的路（✕ + 压灰），后半才是该记住的依据。 */
+  .fv-fbox.judge .fv-ft .fv-neg { color:${FLOW.TXT_3}; }
+  .fv-fbox.judge .fv-ft .fv-x {
+    display:inline-block; font-style:normal; color:${FLOW.ORANGE_L};
+    font-size:13px; font-weight:600; margin-right:3px; transform:translateY(-1px);
+  }
+  .fv-fbox.judge .fv-ft .fv-ok { color:${FLOW.TXT}; font-weight:500; }
+  .fv-fbox.judge .fv-ft .fv-ok::before { content:'——'; color:${FLOW.LINE_2}; font-weight:400; }
   .fv-fbox.pit { background:${FLOW.BG_SOFT}; border:1px solid ${FLOW.LINE}; }
   .fv-fbox.pit .fv-fh { color:#8A5A3A; }
   .fv-fbox.pit .fv-fh .fv-mark { background:#C79570; }
@@ -651,7 +686,7 @@ function renderFlowMarkup(raw, meta) {
       S.judge
         ? `<div class="fv-fbox judge">
       <div class="fv-fh"><span class="fv-mark"></span>关键判断</div>
-      <div class="fv-ft">${esc(clip(S.judge, 110))}</div>
+      <div class="fv-ft">${judgeHtml(clip(S.judge, 110))}</div>
     </div>`
         : ""
     }
