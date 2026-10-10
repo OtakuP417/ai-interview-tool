@@ -306,6 +306,29 @@ console.log('\n[10] SVG XML 安全：markup 要进 foreignObject，必须能过 
   ok(hasBr, '夹具渲染产物中确实出现自闭合 <br/>（软换行路径被覆盖）');
 }
 
+/* ───────── 11. 报告截断防线（2026-10-10，吴敏 id=19 事故回归） ───────── */
+console.log('\n[11] 报告截断防线：残缺报告不允许静默归档');
+{
+  const web = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
+  const srv = fs.readFileSync(
+    path.join(__dirname, '..', 'cloudfunctions', 'interview-proxy', 'index.js'), 'utf8');
+
+  /* 前端 generateReport：截断自动重试（两档预算）+ 残缺时不写 state.reportRaw */
+  ok(/finish_reason\s*===?\s*'length'/.test(web), '前端检测 finish_reason=length');
+  ok(/attempt === 0 \? 8000 : 12000/.test(web), '截断自动重试且第二档预算 12000（16000 会让 v4-flash 返回空 content，禁止更高）');
+  ok(!/max_tokens\s*[:=]\s*16000/.test(web), '报告生成不使用 16000 预算（超上限会拿到空报告）');
+  ok(/secCount < 5/.test(web), '前端节数校验：<5 个分隔符视为残缺');
+  ok(/报告生成不完整/.test(web) && /残缺报告进不了库|残缺报告进不了/.test(web),
+    '残缺时明确报错且阻断归档');
+
+  /* 服务端 submit：最后一道闸 */
+  ok(srv.includes('report_sections_invalid'), 'submit 有 report_sections_invalid 归档闸');
+  ok(/secCount < 5/.test(srv), 'submit 节数阈值与编辑护栏一致（<5 拒绝）');
+
+  /* 对话流式预算：600 会被长对话的推理吃光 → 空回复（id=16 第 48 条实测） */
+  ok(/max_tokens: 2000/.test(web), '对话流式 max_tokens 提到 2000（600 被推理吃光会输出空回复）');
+}
+
 console.log('\n' + '─'.repeat(52));
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exit(fail ? 1 : 0);

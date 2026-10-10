@@ -449,6 +449,16 @@ function handleSubmit(req, res) {
         return;
       }
 
+      /* 报告完整性闸（2026-10-10，吴敏 id=19 事故）：分隔符少于 5 个说明报告
+         缺节 —— 生成时被 max_tokens 掐断的报告会降级成旧版式、还带着空板块。
+         前端有截断重试 + 节数校验，这里是最后一道闸：不管哪条路径进来的
+         残缺报告，都不许带病入库。阈值与正文编辑护栏一致（<5 → 拒绝）。 */
+      const secCount = (row.report_md.match(/---SECTION---/g) || []).length;
+      if (secCount < 5) {
+        sendJson(res, 400, { error: "report_sections_invalid", sections: secCount });
+        return;
+      }
+
       pgRequest("POST", "", row, { Prefer: "return=representation" }).then(function (r) {
         if (!r.ok) {
           sendJson(res, 502, { error: "db_write_failed", status: r.status });

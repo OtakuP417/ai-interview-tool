@@ -838,7 +838,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.10.09-a';
+const APP_BUILD = 'v2026.10.10-a';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -2450,7 +2450,9 @@ async function streamAI(injectedUserMsg = null) {
         model: 'deepseek-v4-flash',
         messages: buildContext(msgs),
         stream: true,
-        max_tokens: 600,
+        max_tokens: 2000,   // 推理 token 计入预算：聊到 20 轮以后输入变长，
+                            // 600 会被推理吃光 → 那一轮输出空内容（实测 id=16 第 48 条）。
+                            // 回复正文只要求 60 字以内，2000 给推理留足余量。
         temperature: 0.7,
       }),
     });
@@ -2571,27 +2573,47 @@ async function generateReport() {
   ];
 
   try {
-    const res = await fetch(API_ENDPOINT, {
-      method: 'POST',
-      headers: getApiHeaders(),
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages: reportMsgs,
-        stream: false,
-        max_tokens: 8000,   // deepseek-v4-flash 是推理模型：推理 token 也计入预算。
-                            // v2026.09.28 用 4600 够；09-29 提示词加了决策三段式/原话行/
-                            // 触发信号/失效边界后输出更重，推理也变长，
-                            // 实测 4600 两次都在 1300-1700 字处被 finish_reason:length 截断，
-                            // 8000 两次都完整 stop（2729/3024 字）。
-        temperature: 0.5,
-      }),
-    });
+    /* 截断防线（2026-10-10，吴敏 id=19 事故）：v4-flash 是推理模型，推理 token
+       计入 max_tokens 预算 —— 访谈越长推理越长，输出写到一半就被掐断，
+       归档出来的报告缺节、邮件降级旧版式还带空板块。
+       现在检测到 finish_reason=length 就自动加大预算重试一次
+       （12000 实测完整；16000 会让 v4-flash 返回空 content，绝不能更高），
+       两次都被截断则明确报错并停在这里，绝不把残缺报告带进归档。 */
+    let raw = '';
+    let truncated = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: getApiHeaders(),
+        body: JSON.stringify({
+          model: 'deepseek-v4-flash',
+          messages: reportMsgs,
+          stream: false,
+          max_tokens: attempt === 0 ? 8000 : 12000,
+          temperature: 0.5,
+        }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || res.status);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || res.status);
 
-    const raw = data.choices?.[0]?.message?.content || '';
-    const truncated = data.choices?.[0]?.finish_reason === 'length';
+      raw = data.choices?.[0]?.message?.content || '';
+      truncated = data.choices?.[0]?.finish_reason === 'length';
+      if (!truncated) break;
+    }
+
+    /* 节数校验：规范的报告至少 5 个分隔符（新格式 6 节 5 个、老格式 6 个）。
+       这是兜底闸 —— 除截断外，v4-flash 在超预算等异常下会返回空 content，
+       finish_reason 未必是 length，只有数分隔符才拦得住。 */
+    const secCount = (raw.match(/---SECTION---/g) || []).length;
+    if (truncated || secCount < 5) {
+      const why = truncated
+        ? '报告两次生成都被输出上限截断'
+        : '报告结构不完整（只有 ' + (secCount + 1) + ' 个部分，规范至少 6 个）';
+      document.getElementById('report-content').innerHTML =
+        `<div class="report-section"><div class="content" style="color:var(--danger)">报告生成不完整：${escHtml(why)}。请点「返回访谈」再点一次「生成报告」重试；多次失败请联系管理员。</div></div>`;
+      return;   // 不写 state.reportRaw —— 归档按钮拿不到内容，残缺报告进不了库
+    }
 
     // 后处理：把节标题归一成标准标题（模型常写成「## 核心做法」「避坑指南」这类）。
     // 必须在赋值前做，否则归档的 report_md 里留着会导致按序号取值取空。
@@ -2601,10 +2623,6 @@ async function generateReport() {
     renderAlert(buildReportAlerts(state.messages, normalized));
     renderCoverage(assessCoverage(normalized, state.messages));
     saveDraft();   // 报告已生成，落盘，便于断线后直接回看
-
-    if (truncated) {
-      alert('报告字数达到上限，末尾可能被截断了。建议点「返回访谈」补充几轮后重新生成，或直接检查最后两节内容是否完整。');
-    }
 
   } catch (e) {
     document.getElementById('report-content').innerHTML =
