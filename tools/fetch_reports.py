@@ -147,7 +147,9 @@ def cmd_stats():
 
 def cmd_json(rid):
     r = detail(rid)
-    fn = "_report_%s.json" % rid
+    # ★ 固定输出到工具所在目录（.gitignore 已忽略 _report_*.json），
+    # 不跟随 cwd —— 否则在仓库根目录执行会落到根目录，绕过忽略规则（2026-10-10 踩过）。
+    fn = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_report_%s.json" % rid)
     with open(fn, "w", encoding="utf-8") as f:
         json.dump(r, f, ensure_ascii=False, indent=1)
     print("已导出 -> " + fn)

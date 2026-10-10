@@ -11,7 +11,9 @@
  *      「星客群」，#19「转化率高」被补成"这次转化率高的案例"就开聊了。
  *
  * 所以这一套断言守的是「主题必须是访谈的主线」，不是"提过一句"。
- * 另附本次一起做的稳定性修复：未完成访谈不许出报告、一轮只许一个问号。
+ * 另附本次一起做的稳定性修复：未完成访谈不许出报告、回复质量兜底。
+ * 兜底判据在 2026-10-10 全库回扫 198 轮后收窄：只拦空回复 / 实质问题 >= 3 /
+ * 半句话 / "（接着问）"类排版标记（原「问号 >1」会误拦 56% 的正常轮次）。
  */
 const fs = require('fs');
 const path = require('path');
@@ -107,7 +109,7 @@ console.log('\n[5] 填写端：把名词短语引导成一句话');
   ok(/点完最好再补上具体的对象和结果/.test(web), '说明方向按钮只是起头，需要补具体对象与结果');
 }
 
-console.log('\n[6] 稳定性：未完成访谈不出报告 + 一轮只许一个问号');
+console.log('\n[6] 稳定性：未完成访谈不出报告 + 只拦真正影响访谈的回复');
 {
   ok(/const MIN_REPORT_ROUNDS = 5;/.test(web), '前端定义报告硬闸 MIN_REPORT_ROUNDS = 5');
   ok(/rounds < MIN_REPORT_ROUNDS/.test(web), 'endAndReport 使用该硬闸（原阈值为 3，#17 就是这么漏出去的）');
@@ -115,11 +117,38 @@ console.log('\n[6] 稳定性：未完成访谈不出报告 + 一轮只许一个�
 
   ok(/function replyLooksBad/.test(web), '有回复质量校验 replyLooksBad');
   ok(/function repairReply/.test(web), '有回复重写 repairReply');
-  ok(/\)\.length > 1\) return true;/.test(web), '校验规则含「一轮多于一个问号」');
   ok(/结尾无标点 = 半句话/.test(web), '校验规则含「半句话被掐断」');
   ok(/await repairReply\(msgs, full\)/.test(web), 'streamAI 在每轮结束后调用校验');
   ok(/push\.reset\(fixed\)/.test(web), '重写结果会替换已渲染的气泡');
   ok(/只重写一次，失败就保留原文/.test(web), '重写失败不阻断访谈');
+
+  /* ★ 闸门判据必须能真跑，不能只看字面 —— 2026-10-10 收窄后新增。
+     背景：原判据「问号 >1」全库回扫命中 56% 的轮次（111/198），其中绝大多数是
+     "同一问题的两种问法"，被访谈人在这些轮次后答得更长（47 vs 44 字），属误拦。 */
+  const gateSrc = web.slice(web.indexOf('const REPLY_MARKER_RE'), web.indexOf('async function endAndReport'));
+  const gate = new Function(gateSrc + '\nreturn { bad: replyLooksBad, cnt: realQuestionCount };')();
+  const bad = gate.bad, cnt = gate.cnt;
+
+  ok(bad('') === true, '空回复判不合格');
+  ok(bad('   ') === true, '纯空白判不合格');
+  ok(bad('这个问题挺典型的，那您当时是怎么处理这种情况的？') === false, '正常单问放行');
+  ok(bad('客户最后接受了，这单就成下来了。那这笔几十万在你们营业部，') === true,
+    '半句话（结尾无标点）判不合格');
+
+  /* 假阳性回归：这四条在原判据下全被误拦，收窄后必须放行 */
+  ok(bad('那客户一般怎么回你？遇到说"不需要"的，你接下来会怎么说？') === false,
+    '「同一问题的两种问法」放行（原判据误拦）');
+  ok(bad('收到短信主动回的这些客户，是不是就直接能做成单子了？还是中间还得聊点别的？') === false,
+    '「二选一被问号拆开」放行（原判据误拦）');
+  ok(bad('好，那这两周一次的联系，一般是通过什么方式？微信还是电话？') === false,
+    '含尾缀确认（"微信还是电话？"）放行（原判据误拦）');
+  ok(cnt('那就是这样吗？') === 0, '尾缀式确认不计入实质问题数');
+
+  /* 真该拦的：>=3 个实质问题、排版标记 */
+  ok(bad('这二十天里您跟客户有没有保持联系？比如隔几天发个消息还是等着？具体是怎么跟的？') === true,
+    '一轮堆 3 个实质问题判不合格');
+  ok(bad('这个做法是你自己琢磨出来的？\n\n（接着问）那第三次跟进又是什么情况促成的？') === true,
+    '「（接着问）」排版标记判不合格（原判据只能靠"有 2 个问号"侥幸拦下）');
 
   // 服务端最后一道闸：不管报告从哪条路径进来，轮次不够都不许入库
   ok(/interview_too_short/.test(srv), '服务端 submit 有 interview_too_short 闸');

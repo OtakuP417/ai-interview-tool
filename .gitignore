@@ -41,15 +41,18 @@ tools/fetch_reports.secret
 # 工具跑出来的结果（分析 md / 真实案例海报 html），随时可再生
 tools/out/
 # fetch_reports.py json 导出的单份报告（含真实姓名/UM/对话原文），绝不入库
-tools/_report_*.json
+# ★ 不带路径前缀：任意目录下的同名导出件一律忽略。
+# 教训（2026-10-10）：曾有一批导出落在仓库根目录，恰好绕过 tools/ 前缀规则。
+_report_*.json
 
 # ── 注意 ────────────────────────────────────────────────────
-# web/*.html 全部入库（含诊断页 diag*.html / index-check.html）：
+# web/*.html 全部入库（含诊断页 diag*.html）：
 # 它们是本机真机排障的现成工具，需要时重新上传即可，不进库就丢了。
+# （index-check.html 已于 2026-10-10 删除：它是 9/29 排障遗留的正式页快照，线上本就 404）
 # cloudfunctions/**、cloudbase/migrations/**、tools/**、tests/verify-*.js
 # 全部入库（这是项目的核心资产与护栏）。
 # tools/_admin.py 是口令读取的唯一出口，必须入库（它本身不含口令）。
-# 唯一例外：tools/_report_*.json（真实报告导出件），见上面的忽略规则。
+# 唯一例外：_report_*.json（真实报告导出件），见上面的忽略规则。
 
 # ── 基于真实报告的分析备忘（含真实姓名/UM/中心归属）──────────
 # docs/ 里放的是「用真实数据跑出来的分析文档」，不是项目源码。

@@ -841,7 +841,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.10.10-c';
+const APP_BUILD = 'v2026.10.10-d';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -2576,12 +2576,34 @@ async function streamAI(injectedUserMsg = null) {
 }
 
 /* 一轮 AI 回复是否违反硬规则。只取最容易被被访谈人看见的三类：
-   空回复 / 一轮多个问号 / 结尾没有标点（半句话被掐断）。 */
+   空回复 / 一轮堆了多个实质问题 / 结尾没有标点（半句话被掐断）。
+
+   ★ 2026-10-10 收窄（全库回扫 198 轮后改）：
+   原判据是"问号 >1"，回扫发现它会命中 56% 的轮次（111/198），但其中绝大多数是
+   ①「同一问题的两种问法」（"那客户一般怎么回你？你接下来会怎么说？"）
+   ②「一个二选一被问号拆开」（"是不是能做成单子？还是中间还得聊点别的？"）
+   —— 被访谈人在这些轮次之后答得更长（47 字 vs 全体 44 字），没有漏答，不该重写。
+   改为只拦"实质问题 >= 3"，并把原先漏掉的"（接着问）"类排版标记补进判据。 */
+const REPLY_MARKER_RE = /[（(](?:接着问|然后问|继续问|再问|追问)/;
 function replyLooksBad(text) {
   const t = String(text || '').trim();
-  if (!t) return true;                                        // 空回复
-  if ((t.match(/[?？]/g) || []).length > 1) return true;      // 一轮问了多个问题
-  return !/[?？。！!）」』】…]$/.test(t);                      // 结尾无标点 = 半句话
+  if (!t) return true;                                  // 空回复
+  if (REPLY_MARKER_RE.test(t)) return true;             // "（接着问）"这类排版标记
+  if (realQuestionCount(t) >= 3) return true;           // 一轮堆了多个实质问题
+  return !/[?？。！!）」』】…]$/.test(t);                 // 结尾无标点 = 半句话
+}
+
+/* 数一条回复里有几个"实质问题"：按问号切句，剔除尾缀式确认
+   （很短、且以吗/呢/吧/么收尾，例如"是这样吗？"）。
+   实测口径：2 个实质问题 = 同一个问题问了两面，属正常访谈手法；>= 3 才是真堆砌。 */
+function realQuestionCount(text) {
+  return String(text || '')
+    .split(/[?？]/)
+    .slice(0, -1)
+    .filter(function (p) {
+      const seg = p.split(/[。！!；;\n]/).pop().trim();
+      return seg.length >= 7 && !/(吗|呢|吧|么)$/.test(seg);
+    }).length;
 }
 
 /* 不合格就让模型重写这一轮；返回重写后的整句，修不好返回 null（调用方保留原文）。
@@ -2599,9 +2621,11 @@ async function repairReply(msgs, bad) {
           ...buildContext(msgs),
           { role: 'assistant', content: bad },
           { role: 'user', content:
-              '你上一条回复不合规。请重写这一句，只输出重写后的内容，不要任何解释：'
-            + '① 必须完整成句、结尾带标点；② 整句最多一个问号，多出来的问题留到下一轮再问；'
-            + '③ 60 字以内；④ 不要出现"（接着问）"这类排版标记。' },
+              '你上一条回复不合规（问题堆得太多、话没说完，或者带了不该有的排版标记）。'
+            + '请重写这一句，只输出重写后的内容，不要任何解释：'
+            + '① 必须完整成句、结尾带标点；'
+            + '② 一轮只问一件事——同一件事的两面可以一起问，但不要塞进第二件不相关的事；'
+            + '③ 80 字以内；④ 不要出现"（接着问）"这类排版标记。' },
         ],
         stream: false,
         max_tokens: 2000,   // 与其他流式调用一致：推理 token 计入预算
