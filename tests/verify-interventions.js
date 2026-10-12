@@ -207,8 +207,8 @@ console.log('\n[1d] 触发器④：做法未问失效边界');
 
   const hit4 = L1.interventions(withMethod(4), '新人快速签约开单');
   ok(!!hit4 && hit4.indexOf('追一句失效边界') >= 0, 'turns=4 + 做法已到方法层 + 未问过 → 注入');
-  ok(!!hit4 && hit4.indexOf('有没有试过不灵的') >= 0, '注入的是口语问法（不说"失效边界"）');
-  ok(!!hit4 && hit4.indexOf('别说"失效边界"') >= 0, '明确要求模型不要用术语');
+  ok(!!hit4 && hit4.indexOf('有没有试过不灵的') >= 0, '注入的是口语问法（不说书面词）');
+  ok(!!hit4 && hit4.indexOf('别说"哪些情况不适用"') >= 0, '明确要求模型不要用书面词（与报告字段名一致）');
 
   const asked4 = L1.interventions(withMethod(4, '那有没有试过不灵的？什么样的客户身上就不管用了？'), '新人快速签约开单');
   ok(!asked4 || asked4.indexOf('追一句失效边界') < 0, 'AI 问过之后 → 停止注入');
@@ -341,7 +341,7 @@ console.log('\n[6] L4 可观测性：注入与闸门事件');
 
 console.log('\n[5] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-f'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-f');
+  ok(/APP_BUILD = 'v2026\.10\.12-g'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-g');
 }
 
 console.log('\n' + (fail ? '✗' : '✓') + ' 通过 ' + pass + ' 项，失败 ' + fail + ' 项\n');

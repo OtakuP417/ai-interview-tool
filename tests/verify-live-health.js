@@ -60,15 +60,15 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
     /可选走法/.test(idx.t) && /选择依据/.test(idx.t) && /被否掉的那条路为什么不行/.test(idx.t));
   ok('线上含结果参照系要求（团队参照）', /团队参照：/.test(idx.t));
   ok('线上含每步原话要求', /原话：「|原话：『/.test(idx.t));
-  ok('线上含经验点八要素（触发信号 + 失效边界）',
-    /触发信号：/.test(idx.t) && /失效边界：/.test(idx.t));
+  ok('线上含经验点八要素（触发信号 + 哪些情况不适用）',
+    /触发信号：/.test(idx.t) && /哪些情况不适用：/.test(idx.t));
   ok('线上访谈含失败单追问', /失败单也要问/.test(idx.t));
   ok('线上访谈含结果参照系追问', /结果要有参照系/.test(idx.t));
   ok('线上访谈含取舍被放弃路径追问', /取舍要问出被放弃的那条路/.test(idx.t));
   ok('线上含节标题归一（normalizeReport）',
     /function normalizeReport\(/.test(idx.t) && /const normalized = normalizeReport\(raw\)/.test(idx.t));
 
-  ok('版本号已更新', /v2026\.10\.12-f/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
+  ok('版本号已更新', /v2026\.10\.12-g/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
 
   console.log('\n[1b] 线上已含语音输入（方案B：腾讯云一句话识别）');
   ok('线上有麦克风按钮', /id="mic-btn"/.test(idx.t) && /function micToggle\(/.test(idx.t));

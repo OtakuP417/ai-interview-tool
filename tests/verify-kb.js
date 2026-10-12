@@ -74,7 +74,7 @@ const ROWS = [
       '   载体/工具：微信语音',
       '   对方没反应时怎么办：先发一条额度截图，过三天再问',
       '   触发信号：客户主动提到朋友、同事也在做生意',
-      '   失效边界：他提到客户都是新客户，未说明对老客户是否适用',
+      '   哪些情况不适用：他提到客户都是新客户，未说明对老客户是否适用',
       '2. 做法：朋友圈晒批款到账截图',
       '   频次/时机：每周两次',
       '   话术/方法：（访谈中未提到）',
@@ -187,12 +187,26 @@ console.log('\n[1] 解析：归并规则 / 两种格式变体 / 六要素');
   ok(c1.fields.trigger && c1.fields.trigger.indexOf('主动提到朋友') >= 0, '要素 trigger 解析');
   ok(c1.fields.boundary && c1.fields.boundary.indexOf('新客户') >= 0, '要素 boundary 解析');
 
+  /* ★ 换词：2026-10-12 起报告字段名从「失效边界」改成「哪些情况不适用」（一线不好理解）。
+     两面都要守：①展示标签是新词 ②解析正则**同时认新旧** —— 存量报告正文里还是旧词，
+     只认新词会让老报告的边界要素整条消失。 */
+  ok(KB.FIELD_LABELS.boundary === '哪些情况不适用',
+    '★ 经验库展示标签用新词「哪些情况不适用」', KB.FIELD_LABELS.boundary);
+  {
+    const bdField = KB.FIELDS.filter(function (f) { return f[0] === 'boundary'; })[0];
+    ok(!!bdField && bdField[1].test('哪些情况不适用：只在见过面的客户身上有效'), '识别新词');
+    ok(!!bdField && bdField[1].test('失效边界：只在见过面的客户身上有效'),
+      '★ 换词后仍识别旧词（存量报告正文里是旧词，只认新词会丢要素）');
+    ok(!!bdField && !bdField[1].test('触发信号：客户主动问额度'),
+      'boundary 正则不会误吞其他要素');
+  }
+
   /* 缺失标记：整条就是"没问出来" → missing；空值 → absent */
   const c2 = t101.cards[1];
   ok(c2.missing.indexOf('how') >= 0, 'how=（访谈中未提到）→ 标 missing', JSON.stringify(c2.missing));
   ok(c2.absent.length >= 1, '没写出来的要素进 absent', JSON.stringify(c2.absent));
 
-  /* ★ MISSING_RE 必须整条锚定：这句含"未说明"但是**有效的失效边界** */
+  /* ★ MISSING_RE 必须整条锚定：这句含"未说明"但是**有效的边界说明** */
   ok(KB.MISSING_RE.test('（访谈中未提到）') === true, 'MISSING_RE：整条"未提到"判为缺失');
   ok(KB.MISSING_RE.test(c1.fields.boundary) === false,
     '★ MISSING_RE：含"未说明"但内容是有效边界的句子不判缺失', c1.fields.boundary);
@@ -439,7 +453,7 @@ console.log('\n[3] 服务端 /api/kb：白名单列 + 路由 + 405');
 
 console.log('\n[4] kb.html：页面契约');
 {
-  ok(/const KB_BUILD = 'v2026\.10\.12-c';/.test(kbHtml), 'KB_BUILD 已声明',
+  ok(/const KB_BUILD = 'v2026\.10\.12-d';/.test(kbHtml), 'KB_BUILD 已声明',
     (kbHtml.match(/KB_BUILD = '[^']*'/) || [''])[0]);
   ok(/\/api\/kb'/.test(kbHtml), 'KB_API 指向 /api/kb');
 
@@ -525,11 +539,11 @@ console.log('\n[5] 三端互不越界');
 
 console.log('\n[6] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-f'/.test(web), '访谈页 APP_BUILD',
+  ok(/APP_BUILD = 'v2026\.10\.12-g'/.test(web), '访谈页 APP_BUILD',
     (web.match(/APP_BUILD = '[^']*'/) || [''])[0]);
   ok(/ADMIN_BUILD = 'v2026\.10\.12-c'/.test(adm), '管理端 ADMIN_BUILD（加知识库入口后 bump）',
     (adm.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
-  ok(/KB_BUILD = 'v2026\.10\.12-c'/.test(kbHtml), '知识库 KB_BUILD（加双维度与「按动作看」后 bump）');
+  ok(/KB_BUILD = 'v2026\.10\.12-d'/.test(kbHtml), '知识库 KB_BUILD（换「哪些情况不适用」字段名后 bump）');
 }
 
 console.log('\n[8] ★ kb-stage.js：受约束输出 + 内容锚校验（两个已踩过的坑都要守住）');
