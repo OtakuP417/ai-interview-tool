@@ -281,7 +281,7 @@ console.log('\n[3] 服务端 /api/kb：白名单列 + 路由 + 405');
 
 console.log('\n[4] kb.html：页面契约');
 {
-  ok(/const KB_BUILD = 'v2026\.10\.12-a';/.test(kbHtml), 'KB_BUILD 已声明',
+  ok(/const KB_BUILD = 'v2026\.10\.12-b';/.test(kbHtml), 'KB_BUILD 已声明',
     (kbHtml.match(/KB_BUILD = '[^']*'/) || [''])[0]);
   ok(/\/api\/kb'/.test(kbHtml), 'KB_API 指向 /api/kb');
 
@@ -354,9 +354,93 @@ console.log('\n[6] 版本号');
     (web.match(/APP_BUILD = '[^']*'/) || [''])[0]);
   ok(/ADMIN_BUILD = 'v2026\.10\.12-c'/.test(adm), '管理端 ADMIN_BUILD（加知识库入口后 bump）',
     (adm.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
-  ok(/KB_BUILD = 'v2026\.10\.12-a'/.test(kbHtml), '知识库 KB_BUILD（新建）');
+  ok(/KB_BUILD = 'v2026\.10\.12-b'/.test(kbHtml), '知识库 KB_BUILD（加同义词检索后 bump）');
 }
 
-console.log('\n' + '─'.repeat(56));
-console.log('案例经验库护栏：' + pass + ' 通过 / ' + fail + ' 失败');
-process.exit(fail ? 1 : 0);
+console.log('\n[7] 同义词检索（jsdom 真跑页面搜索，不看字面）');
+{
+  const { JSDOM } = require('jsdom');
+
+  /* 夹具：三张卡，刻意让"同一个意思、不同说法"真实存在 ——
+     卡 1-1 说「周转」、卡 1-2 说「放款截图」、卡 2-1 说「到账」。
+     这三组词必须能互相搜到，否则同义词表就是摆设。 */
+  const FX = {
+    generated_at: 'fixture',
+    field_labels: KB.FIELD_LABELS,
+    stats: { reports: 2, topics: 2, cards: 3, full: 3, basic: 0, quoted: 0, masked: 0 },
+    topics: [
+      { name: '客户转介绍', cards: [], cases: [] },
+      { name: '批款后的跟进与服务', cards: [], cases: [] },
+    ],
+    cards: [
+      { key: '1-1', report_id: 1, topic: '客户转介绍', topic_raw: '老客户转介绍', grade: 'full',
+        title: '回访时顺带问一句', body: '', fields: { how: '客户说手头紧、要周转' },
+        missing: [], absent: [], quotes: [], date: '2026-10-01' },
+      { key: '1-2', report_id: 1, topic: '客户转介绍', topic_raw: '老客户转介绍', grade: 'full',
+        title: '晒批款记录', body: '', fields: { how: '把放款截图发到朋友圈' },
+        missing: [], absent: [], quotes: [], date: '2026-10-01' },
+      { key: '2-1', report_id: 2, topic: '批款后的跟进与服务', topic_raw: '批款跟进', grade: 'full',
+        title: '到账当天致电', body: '', fields: { how: '到账当天打电话' },
+        missing: [], absent: [], quotes: [], date: '2026-10-02' },
+    ],
+  };
+
+  const script = (kbHtml.match(/<script>([\s\S]*?)<\/script>/) || [])[1];
+  const shell = kbHtml.replace(/<script>[\s\S]*?<\/script>/, '');
+  const dom = new JSDOM(shell, { runScripts: 'dangerously', url: 'http://127.0.0.1:8899/kb.html' });
+  const w = dom.window;
+  w.fetch = () => Promise.resolve({ json: () => Promise.resolve(FX) });
+  /* 末尾补一行把同义词表暴露出来：顶层 const 在后续 eval 里读不到，
+     只有同一次 eval 内可见（jsdom 的老坑）。 */
+  w.eval(script + '\n;window.__SYN = SYN_GROUPS;');
+
+  return new Promise((resolve) => setTimeout(resolve, 60)).then(() => {
+    const doc = w.document;
+    const setQ = (v) => {
+      const q = doc.getElementById('q');
+      q.value = v;
+      q.dispatchEvent(new w.Event('input', { bubbles: true }));
+      return doc.querySelectorAll('.card').length;
+    };
+
+    doc.getElementById('v-all').onclick();
+
+    /* (a) 结构：表本身立得住 */
+    const SYN = w.__SYN;
+    ok(Array.isArray(SYN) && SYN.length >= 5, '同义词表已加载', String(SYN && SYN.length) + ' 组');
+    ok(SYN.every((g) => Array.isArray(g) && g.length >= 2), '每组至少 2 个说法');
+    ok(SYN.every((g) => g.every((t) => typeof t === 'string' && t === t.trim() && t === t.toLowerCase() && t.length >= 2)),
+      '所有词都是 ≥2 字的小写词（与 kw 的 lowercase 口径一致）');
+    const seen = {};
+    const dupes = [];
+    SYN.forEach((g) => g.forEach((t) => { if (seen[t]) dupes.push(t); seen[t] = 1; }));
+    ok(dupes.length === 0, '★ 没有跨组重复的词（重复会让搜索意图变歧义）', dupes.join('、'));
+
+    /* (b) 端到端：口语词要能命中书面词的卡片 */
+    ok(setQ('周转') === 1, '搜「周转」命中 1 张', String(setQ('周转')));
+    ok(setQ('没钱') === 1, '★ 搜「没钱」也命中同一张（同义词生效，语料里并没有"没钱"这个词）',
+      String(setQ('没钱')));
+    ok(setQ('资金紧张') === 1, '★ 搜「资金紧张」同样命中', String(setQ('资金紧张')));
+    ok(setQ('到账') === 2, '搜「到账」命中 2 张（到账 + 放款截图同组）', String(setQ('到账')));
+    ok(setQ('放款') === 2, '搜「放款」命中同样 2 张（与「到账」互认）', String(setQ('放款')));
+
+    /* (c) 多词 AND：单独都有结果，合起来没有 → 必须是 0 */
+    ok(setQ('周转') > 0 && setQ('朋友圈') > 0, '两个词单独搜都有结果');
+    ok(setQ('周转 朋友圈') === 0, '★ 空格分隔 = 同时满足（AND），不是任一命中', String(setQ('周转 朋友圈')));
+    ok(setQ('  周转   ') === 1, '多余空格被忽略，不会变成空词');
+
+    /* (d) 空态 */
+    ok(setQ('zzz不存在zzz') === 0 && /没有匹配/.test(doc.getElementById('main').textContent),
+      '搜不到时给空态提示');
+
+    /* (e) 提示文案：口径要让用户看得懂 */
+    const hint = doc.getElementById('q-hint');
+    ok(!!hint && /空格隔开/.test(hint.textContent), '提示里说明了「空格=同时满足」');
+    ok(!!hint && /同义词/.test(hint.textContent), '提示里说明了会自动连同义词一起找');
+
+    console.log('\n' + '─'.repeat(56));
+    console.log('案例经验库护栏：' + pass + ' 通过 / ' + fail + ' 失败');
+    w.close();
+    process.exit(fail ? 1 : 0);
+  });
+}

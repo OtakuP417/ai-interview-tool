@@ -61,6 +61,7 @@ body {
 }
 .seg button + button { border-left: 1px solid var(--border); }
 .seg button.on { background: var(--accent-light); color: var(--accent-text); font-weight: 600; }
+.search-hint { margin-top: 8px; font-size: 12px; color: var(--text-hint); line-height: 1.6; }
 
 main { padding: 18px 0 40px; }
 .loading, .empty { color: var(--text-hint); text-align: center; padding: 48px 0; font-size: 14px; }
@@ -158,6 +159,7 @@ table.bd td:first-child { color: var(--text-muted); white-space: nowrap; }
         <button id="v-all">全部做法</button>
       </div>
     </div>
+    <div class="search-hint" id="q-hint">多个词用空格隔开表示同时满足；「没钱」这类口语会连同义词（周转、用钱…）一起找</div>
   </div>
 </header>
 
@@ -186,7 +188,7 @@ table.bd td:first-child { color: var(--text-muted); white-space: nowrap; }
 </footer>
 
 <script>
-const KB_BUILD = 'v2026.10.12-a';
+const KB_BUILD = 'v2026.10.12-b';
 const KB_API = 'https://work-d1gs0jzrg2277d75e-1391683363.ap-shanghai.app.tcloudbase.com/api/kb';
 
 let KB = null;
@@ -199,12 +201,64 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+/* ── 同义词表 ───────────────────────────────────────────────
+   左边偏口语、右边是报告里的书面说法（方向不重要，组内互相等价）。
+   ★ 建表原则：每组**至少有一个词在现有卡片里真实出现过** —— 否则这组
+     扩了也搜不到东西，属于自我安慰。具体命中情况跑
+     tests/tmp/syn-probe.js（读本文件里的这张表，对着线上 /api/kb 复核）。
+   ★ 一个词只能属于一个组：跨组会让"用户到底想搜什么"变得歧义。
+     加词前先在下面全文搜一遍，确认没被别的组用过。
+   ★ 这张表的价值取决于"同事实际会打什么词"，而目前没有搜索日志，
+     所以它是一版**业务判断的初稿**，将来按真实用法增删即可。
+   改了这张表要跑 tests/verify-kb.js。 */
+const SYN_GROUPS = [
+  ['没钱', '缺钱', '缺资金', '资金紧张', '周转', '用钱'],
+  ['孤儿单', '老客户', '存量客户', '存量', '盘活'],
+  ['批款', '放款', '到账', '审批', '下发'],
+  ['额度', '授信', '件均', '批多少'],
+  ['挂断', '被拒', '拒绝', '拒贷', '不接'],
+  ['房抵', '二押', '抵押', '房产'],
+  ['微信', '朋友圈'],
+  ['话术', '说法', '开场', '怎么说'],
+  ['频次', '时机', '多久', '什么时候', '周期'],
+  ['转介绍', '转介', '老带新', '推荐'],
+  ['新人', '新顾问', '刚入职', '新同事'],
+  ['法人', '企业主', '营业执照', '个体户'],
+  ['受薪', '工薪', '上班族', '工资'],
+  ['转化率', '成交率', '通过率'],
+  ['棱镜', '大额', '百万'],
+];
+
+/* 一个查询词 → 它的全部等价说法（不在表里就只等于它自己） */
+function termAlt(t) {
+  for (let i = 0; i < SYN_GROUPS.length; i++) {
+    if (SYN_GROUPS[i].indexOf(t) >= 0) return SYN_GROUPS[i];
+  }
+  return [t];
+}
+
 function hay(card) {
   const parts = [card.title, card.body, card.topic, card.topic_raw].concat(card.quotes || []);
   Object.keys(card.fields || {}).forEach(k => parts.push(card.fields[k]));
   return parts.join(' ').toLowerCase();
 }
-function match(card) { return !kw || hay(card).indexOf(kw) >= 0; }
+
+/* 多个词用空格隔开 = 同时满足（与管理端搜索同一套口径）。
+   每个词先按同义词组展开，任一等价说法命中即算该词命中。 */
+function match(card) {
+  const terms = kw ? kw.split(/\s+/).filter(Boolean) : [];
+  if (!terms.length) return true;
+  const h = hay(card);
+  for (let i = 0; i < terms.length; i++) {
+    const alts = termAlt(terms[i]);
+    let hit = false;
+    for (let j = 0; j < alts.length; j++) {
+      if (h.indexOf(alts[j]) >= 0) { hit = true; break; }
+    }
+    if (!hit) return false;
+  }
+  return true;
+}
 
 function cardHtml(c) {
   const FL = KB.field_labels;
