@@ -841,7 +841,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.10.10-d';
+const APP_BUILD = 'v2026.10.12-a';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -1831,6 +1831,42 @@ function renderCoverage(coverage) {
   box.innerHTML = '<div class="cov-wrap">' + head + '<div class="cov-chips">' + chips + '</div></div>';
 }
 
+/* 报告对对话的覆盖跨度检测（2026-10-12）。
+   背景：id=21 实测 —— 46 轮访谈，报告只用了对话前 49% 的内容，后 40% 一条没采
+   （利息话术、频次分档、丢单复盘全丢）。成因可能是"生成时只顾主线"，也可能是
+   "拿的是中途生成的旧报告"；两种成因在数据上都表现为"报告只覆盖前半段"。
+   判法：把每条回答切成 6 字滑窗，看是否有片段出现在报告里；按对话先后分 5 段
+   看分布，**末段全空、前段有命中**就说明报告没吃后半段。 */
+function reportSpan(md, messages) {
+  const flat = String(md || '').replace(/\s+/g, '');
+  const users = (messages || []).filter(m => m.role === 'user' && !m.internal);
+  if (!flat) return null;
+  const judged = users.map((m) => {
+    const s = String(m.content || '').replace(/\s+/g, '');
+    if (s.length < 10) return null;        // 太短无法判定，跳过
+    for (let i = 0; i + 6 <= s.length; i++) {
+      if (flat.indexOf(s.slice(i, i + 6)) >= 0) return true;
+    }
+    return false;
+  });
+  const real = judged.filter(v => v !== null);
+  if (real.length < 4) return null;        // 样本太少不判，避免误报
+  const segs = 5;
+  const buckets = Array.from({ length: segs }, () => []);
+  real.forEach((v, k) => {
+    buckets[Math.min(Math.floor(k * segs / real.length), segs - 1)].push(v);
+  });
+  const headHit = buckets[0].filter(Boolean).length;
+  const tailHit = buckets[3].concat(buckets[4]).filter(Boolean).length;
+  return {
+    n: real.length,
+    hitRate: real.filter(Boolean).length / real.length,
+    headHit: headHit,
+    tailHit: tailHit,
+    tailEmpty: tailHit === 0 && headHit > 0,
+  };
+}
+
 /* 报告页要显示的内容 = 覆盖度结论（主判据）+ 原有报告问题。
    头条结论必须同时看两个信号，否则会自相矛盾：
    结构上六维齐备（如 #8 王示例，56 字原话也凑齐了六节）但客户原话总量极少时，
@@ -1858,6 +1894,18 @@ function buildReportAlerts(messages, raw) {
           + '报告里缺的这几块，模型只能用通用说法撑篇幅，建议返回访谈补上再重新生成。',
     });
   }
+
+  /* 覆盖跨度告警：报告只用了对话前半段 —— 这是素材"丢了"，与上面的"素材不足"是两回事。 */
+  const span = reportSpan(raw, messages);
+  if (span && span.tailEmpty) {
+    list.push({
+      level: 'warn',
+      text: '报告的素材只覆盖了对话前半段（约 ' + Math.round(span.hitRate * 100)
+          + '% 的回答被采用，后半段一条没进报告）。这多半是报告过期、或生成时漏读了后段，'
+          + '请点「重新生成报告」再试一次；若仍然如此，把这份访谈反馈给管理员。',
+    });
+  }
+
   return list.concat(collectReportIssues(messages, raw));
 }
 
@@ -2076,15 +2124,24 @@ const REPORT_PROMPT = (n, p, t) => `请根据以上完整的访谈对话内容�
 读完这一节，同事能不能在明天就把动作做出来？
 凡是只有动作名、没有做法的句子（"定期维护""加强沟通""主动转介绍""做好服务"），一律不合格，必须写清具体怎么做。
 
-【三条最容易写不合格的地方 · 写完自查】
+【四条最容易写不合格的地方 · 写完自查】
 1. **只报结果、没有参照系**：光写"做到 300 万"，读者不知道这是好还是坏。
    凡是出现结果数字，必须同时给出参照（团队平均 / 他自己的平时水平 / 同条件同事的档次）。
    对话里没问到参照，就写"（这个数字的参照系访谈中未提到）"，不要自己造一个。
 2. **只写选了什么、没写放弃了什么**：判断与取舍一节如果只写"他决定先做老客户"，
-   读者学不到边界。每条决策都要写清另外那条被否掉的路。
+   读者学不到边界。**凡是他自己提到过取舍的地方**（放弃了某类客户、换过做法、
+   对不同客户分档处理），都要写清另外那条路是什么、为什么不行。
+   ⚠️ 但**不是每条做法都有取舍** —— 很多做法是条件使然（"从车身广告上抄号码"
+   根本不是二选一，而是他手头只有这个号源）。这类做法**不要硬凑一条"被否掉的路"**，
+   这一段整个不写即可；凑出来的那条是编造。
 3. **一条做法里一句原话都没有**：核心做法每一步至少要保住一句被访谈人的原话
    （用「」标出），原话是这份报告最不可替代的部分。
    **确实没有原话的步骤，那一行写"（访谈中未留下原话）"，不要自己造一句。**
+4. **只用了对话前半段的素材**：对话是按时间顺序推进的，越往后问得越深
+   （利息怎么接、被截单怎么复盘、什么情况下这招就不管用了）。
+   **这些后段内容往往比前段更值钱，不许因为"不合主线"或"前面已经写过流程了"就丢掉。**
+   动笔前先自查：对话最后三分之一的回答里，有几条的内容进了这份报告？
+   如果有具体动作、有原话的一条都没用上，说明你漏读了，回去把后段重看一遍再写。
 
 【不许编造 · 最后再看一遍】
 只写对话里出现过的内容。不要补充被访谈人没说的经验、数字、话术、工具或案例。对话中没提到的细节，就写"这一点访谈中未展开"，不要用行业通用说法把它填满。宁可少写一条，不要凑数。
@@ -2699,6 +2756,14 @@ function showGatePanel(a) {
 
 async function generateReport() {
   showScreen('report-screen');
+  /* ★ 2026-10-12：进这个函数就是要重新生成，先把旧报告清空。
+     否则一旦生成失败或被结构校验拦下（下面的分支都只改 UI、不写 reportRaw），
+     旧报告会留在 state.reportRaw 里——归档按钮照样能提交，
+     用户会拿到一份与当前对话不匹配的过期报告，而且界面上看不出差别。
+     实测 id=21：46 轮访谈，报告只覆盖到对话 49%，后 40% 一条素材没采，
+     最可能就是中途生成过一版、之后再没成功覆盖。 */
+  state.reportRaw = '';
+  saveDraft();          // 旧报告立刻从草稿里也清掉，防刷新后恢复
   renderReportMeta();
   renderAlert([]);
   renderCoverage(null);
@@ -3053,6 +3118,22 @@ async function submitArchive() {
     st.textContent = '报告尚未生成，无法归档';
     st.className = 'archive-status err';
     return;
+  }
+
+  /* 覆盖跨度闸（2026-10-12）：报告只用了对话前半段时不直接归档。
+     归档会连带自动发信，归档出去就追不回来了；先让操作者确认一次。 */
+  const span = reportSpan(state.reportRaw, state.messages);
+  if (span && span.tailEmpty) {
+    const go = confirm(
+      '这份报告的素材只覆盖了对话前半段，后半段的内容没有进报告。\n\n'
+      + '多半是报告过期（中途生成过一版），也可能是生成时漏读了后段。\n'
+      + '建议先点「重新生成报告」，确认报告用上后段素材再归档。\n\n'
+      + '仍要按当前这版归档吗？');
+    if (!go) {
+      st.textContent = '已取消归档 · 建议重新生成报告后再提交';
+      st.className = 'archive-status err';
+      return;
+    }
   }
 
   btn.disabled = true;
