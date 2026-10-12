@@ -96,7 +96,9 @@ console.log("\n[7] 刻意不设轮次上限：softMaxRounds 已移除，只留�
 console.log("\n[8] 页面源码里不再有 slice(0, 40) 的老写法");
 {
   ok("旧的 slice(0,40) 已移除", !/\.slice\(0,\s*40\)/.test(html));
-  ok("streamAI 用 buildContext", /messages:\s*buildContext\(msgs\)/.test(html));
+  /* 2026-10-12：发送前先过 L1 条件注入，所以送的是 reqMsgs（注入只进本次请求） */
+  ok("streamAI 用 buildContext（注入后的 reqMsgs）",
+    /messages:\s*buildContext\(reqMsgs\)/.test(html) && /const reqMsgs = withIntervention\(msgs, tip\)/.test(html));
   ok("generateReport 用 buildContext", /buildContext\(state\.messages,\s*CTX_MAX_CHARS_REPORT\)/.test(html));
 }
 
