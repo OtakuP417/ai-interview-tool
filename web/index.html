@@ -142,20 +142,6 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
   content: ''; flex: 1; height: 0.5px; background: var(--border);
 }
 
-/* ── 主题快选标签 ── */
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.chip {
-  background: var(--surface2);
-  border: 0.5px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 11px;
-  font-size: 11.5px; color: var(--text-muted);
-  font-family: inherit; cursor: pointer;
-  transition: all 0.15s;
-}
-.chip:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent-light); }
-.chip:active { transform: scale(0.97); }
-
 .apikey-row { display: flex; gap: 8px; }
 .apikey-row input { flex: 1; font-family: "SF Mono", Consolas, monospace; font-size: 12.5px; }
 .icon-btn {
@@ -677,16 +663,8 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
       <label>本次访谈主题 <span class="req">*</span></label>
       <!-- 主题写得越具体，访谈越问得到点子上：AI 开聊前会先把主题拆成几个必答子问题，
            而只写"转化率高"这种短语时，它只能靠自己猜你要聊的是哪件事。 -->
-      <textarea id="f-topic" placeholder="写成一句话：在什么条件下 + 做了什么 + 得到什么结果&#10;好例：电销名单挑女客户，把首通电话转化率做到 30%&#10;欠佳：转化率高（太笼统，访谈容易问不到点上）"></textarea>
-      <div class="field-hint">尽量写成一句话，结构是「<b>在什么条件下 + 做了什么 + 得到什么结果</b>」。下面几个方向按钮只是起个头，点完最好再补上具体的对象和结果。</div>
-      <div class="chips" id="topic-chips">
-        <button class="chip" onclick="pickTopic(this)">客户转介绍</button>
-        <button class="chip" onclick="pickTopic(this)">孤儿单盘活</button>
-        <button class="chip" onclick="pickTopic(this)">批款后的跟进与服务</button>
-        <button class="chip" onclick="pickTopic(this)">高件均客户开发</button>
-        <button class="chip" onclick="pickTopic(this)">被拒客户的二次挽回</button>
-        <button class="chip" onclick="pickTopic(this)">渠道/存量客户经营</button>
-      </div>
+      <textarea id="f-topic" placeholder="填写和运营沟通好的访谈主题"></textarea>
+      <div class="field-hint">主题写清晰明确即可。</div>
     </div>
 
     <div class="section-sep"><span>归档信息</span></div>
@@ -841,7 +819,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.10.12-e';
+const APP_BUILD = 'v2026.10.12-f';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -2605,20 +2583,6 @@ function showError(msg) {
   el.textContent = msg; el.style.display = 'block';
 }
 function clearError() { document.getElementById('setup-error').style.display = 'none'; }
-
-/* 主题快选：点一下把方向填进输入框，用户再按自己的说法改。
-   全是自由填写的话，不同人对同一件事会写出差别很大的主题，
-   访谈的挖掘方向也就跟着漂。 */
-function pickTopic(btn) {
-  const ta = document.getElementById('f-topic');
-  if (!ta) return;
-  const cur = ta.value.trim();
-  const label = btn.textContent.trim();
-  // 已经写过的内容保留，把选中的方向拼在后面
-  ta.value = cur ? (cur.includes(label) ? cur : cur + ' · ' + label) : label;
-  ta.focus();
-  autoResize(ta);
-}
 
 async function startInterview() {
   clearError();

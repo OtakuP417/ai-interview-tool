@@ -68,7 +68,7 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
   ok('线上含节标题归一（normalizeReport）',
     /function normalizeReport\(/.test(idx.t) && /const normalized = normalizeReport\(raw\)/.test(idx.t));
 
-  ok('版本号已更新', /v2026\.10\.12-e/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
+  ok('版本号已更新', /v2026\.10\.12-f/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
 
   console.log('\n[1b] 线上已含语音输入（方案B：腾讯云一句话识别）');
   ok('线上有麦克风按钮', /id="mic-btn"/.test(idx.t) && /function micToggle\(/.test(idx.t));
