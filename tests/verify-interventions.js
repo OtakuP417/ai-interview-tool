@@ -1,5 +1,5 @@
 /**
- * L1 条件注入 + L2 冲突消解 护栏（2026-10-12，v2026.10.12-d）
+ * L1 条件注入 + L2 冲突消解 护栏（2026-10-12，v2026.10.12-e）
  *
  * 事故背景：扫 6 份归档 / 169 轮 AI 回复后发现 —— 凡「要求模型停下或退回」的规则
  * 执行率都是 0：
@@ -325,11 +325,23 @@ console.log('\n[6] L4 可观测性：注入与闸门事件');
   ok(/\$\{renderGateLog\(row\)\}/.test(adm), '详情页插入了事件区块');
   ok(/GATE_LOG_LABELS/.test(adm), '事件类别有中文标签（不把 inject_* 直接甩给运营）');
   ok(/只记类别与轮次，不记访谈内容/.test(adm), '界面写明只记类别与轮次');
+
+  /* app_build：让归档自证"由哪一版前端产出"。
+     2026-10-12 的现场教训 —— 用户开着的旧页面不刷新，就一直跑旧代码：d 版
+     11:26 上线，11:35 归档的那份访谈仍是上午打开的旧版，L1/L2/L4 全部未参与。
+     而 gate_log 为 null **两种原因都可能**（旧版前端 / 新版但零事件，因为
+     cleanGateLog 对空数组也返回 null），当时只能靠"回放对比 + 读开场白"推理。
+     有了 app_build，这类判断一眼就能完成。 */
+  ok(/app_build: APP_BUILD,/.test(web), '归档 payload 带上 app_build');
+  ok(/app_build: asText\(body\.app_build, 40\) \|\| null,/.test(srv), '/api/submit 写入 app_build（截断防脏值）');
+  ok(/function renderAppBuild\(row\)/.test(adm), '管理端有 renderAppBuild');
+  ok(/\$\{renderAppBuild\(row\)\}/.test(adm), '详情页插入了程序版本');
+  ok(/未记录（该记录早于本功能上线）/.test(adm), '旧记录空态有解释（不把"没数据"显示成"坏了"）');
 }
 
 console.log('\n[5] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-d'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-d');
+  ok(/APP_BUILD = 'v2026\.10\.12-e'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-e');
 }
 
 console.log('\n' + (fail ? '✗' : '✓') + ' 通过 ' + pass + ' 项，失败 ' + fail + ' 项\n');

@@ -623,7 +623,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.10.12-a';
+const ADMIN_BUILD = 'v2026.10.12-b';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
@@ -1124,6 +1124,20 @@ const GATE_LOG_LABELS = {
   gate_unfixed: '回复不合格 · 重写未成功',
 };
 
+/* 这份报告由哪一版前端产出。
+   2026-10-12 的教训：静态托管的 JS 只在页面加载时取一次，用户不刷新就一直
+   跑旧代码 —— 当时那份访谈（id=22）看起来各项都正常，实际跑的是上午打开的
+   旧页面，L1/L2/L4 一个都没参与，靠"回放对比 + 读开场白"才判定出来。
+   有了这一行，以后一眼就能看出来，而且能反向知道"某次改动从哪份访谈开始生效"。 */
+function renderAppBuild(row) {
+  const b = row.app_build ? esc(row.app_build) : '';
+  return '<div class="meta-item"><div class="meta-label">程序版本'
+    + '<span class="meta-hint">归档时访谈页的版本</span></div>'
+    + '<div class="meta-value">'
+    + (b || '<span style="color:var(--text-hint)">未记录（该记录早于本功能上线）</span>')
+    + '</div></div>';
+}
+
 function renderGateLog(row) {
   const log = Array.isArray(row.gate_log) ? row.gate_log : [];
   if (!log.length) {
@@ -1194,6 +1208,7 @@ function renderDetail(row) {
             }).join('')
           : '<span style="color:var(--text-hint)">未打标</span>'
       }</div></div>
+      ${renderAppBuild(row)}
       ${renderGateLog(row)}
     </div>
 

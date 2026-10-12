@@ -841,7 +841,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.10.12-d';
+const APP_BUILD = 'v2026.10.12-e';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -3424,6 +3424,9 @@ async function submitArchive() {
     round_count: countRounds(state.messages),   // 与 transcript 口径一致，避免计数器漂移
     report_md: state.reportRaw,
     gate_log: state.events,   // L4：本场访谈的注入/闸门事件（只含类别与轮次，不含内容）
+    /* L4：前端程序版本。归档要能自证"这份报告由哪一版前端产出" ——
+       否则一旦某份访谈没有事件记录，就分不清是"旧页面没刷新"还是"新版真的没触发"。 */
+    app_build: APP_BUILD,
     transcript,
     poster_png_base64: posterPng,   // 简略一图流；可能为 null：服务端自动降级
     full_png_base64: fullPng,       // 完整报告长图；可能为 null：服务端自动降级

@@ -171,7 +171,7 @@ ok('打开基础信息/正文编辑器时收起 AI 面板',
    /closeAiEdit\(\);/.test(ADM.slice(ADM.indexOf('function openEdit'), ADM.indexOf('async function saveEdit'))) &&
    /closeAiEdit\(\);/.test(ADM.slice(ADM.indexOf('function openReportEdit'), ADM.indexOf('function closeReportEdit'))));
 ok('AI 面板内容全部经 esc() 转义（模型输出当不可信文本对待）', /esc\(trunc\(o\.before/.test(ADP) && /esc\(trunc\(o\.after/.test(ADP));
-ok('版本号已 bump 到 v2026.10.12-a', /ADMIN_BUILD = 'v2026\.10\.12-a'/.test(ADM));
+ok('版本号已 bump 到 v2026.10.12-b', /ADMIN_BUILD = 'v2026\.10\.12-b'/.test(ADM));
 
 console.log(fail ? '\n✗ ' + fail + ' 项失败' : '\n✓ 全部通过');
 process.exit(fail ? 1 : 0);

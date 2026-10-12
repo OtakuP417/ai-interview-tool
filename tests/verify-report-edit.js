@@ -101,7 +101,7 @@ console.log('\n[8] 文案与版本');
 ok('基础信息编辑的说明已同步更新（不再说正文不可改）',
    !/报告正文与对话记录不可修改/.test(ADM));
 ok('注释里说明 transcript 仍不可编辑', /对话原文（transcript）仍然不可编辑/.test(ADM));
-ok('版本号已 bump', /ADMIN_BUILD = 'v2026\.10\.12-a'/.test(ADM));
+ok('版本号已 bump', /ADMIN_BUILD = 'v2026\.10\.12-b'/.test(ADM));
 
 console.log('\n[9] 迁移');
 const mig = fs.readFileSync(

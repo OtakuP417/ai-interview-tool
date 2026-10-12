@@ -463,6 +463,9 @@ function handleSubmit(req, res) {
         transcript: maskTranscript(body.transcript),
         /* L4：规则注入与闸门命中事件（只含类别与轮次，白名单清洗后入库） */
         gate_log: cleanGateLog(body.gate_log),
+        /* L4：前端程序版本。没有这一列就分不清"旧页面没刷新"和"新版真没触发" ——
+           静态托管的 JS 只在页面加载时取一次，不刷新就一直跑旧代码。 */
+        app_build: asText(body.app_build, 40) || null,
       };
 
       const missing = [];
