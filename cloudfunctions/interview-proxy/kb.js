@@ -49,8 +49,9 @@ const FIELD_LABELS = {
 /* 凡沿用旧模板的报告（多在 2026-09 及以前）没有八要素，靠「核心做法」兜底 */
 const OLD_BEFORE = '2026-09-30';
 
-/* 主题归并：16 份报告 16 个主题、多数只有 1 份，直接铺开会很碎。
-   按打法关键词归组；未命中的保留原主题。 */
+/* 场景关键词表。★ 判据跑在**卡片自身文本**上，不再跑在报告主题上 ——
+   报告主题只说明"这次访谈聊什么"，同一份报告里的做法常常跨场景。
+   （2026-10-12 实测：69 张卡里只有 11 张的文本能自证属于所在组。） */
 const TOPIC_GROUPS = [
   ['客户转介绍', /转介绍/],
   ['批款后的跟进与服务', /批款|跟进与服务/],
@@ -65,17 +66,65 @@ const TOPIC_GROUPS = [
   ['高件均客户开发', /高件均/],
 ];
 
+/* 与具体场景无关的通用招式 —— 模型判定用这个词，不进场景索引 */
+const GENERIC_SCENE = '通用';
+
+/* ── 动作阶段（客户旅程八阶段）────────────────────────────────
+   为什么必须有这个维度：这些访谈产出的做法约七成是**跨场景的通用招式**
+   （致电/测额/约见/寒暄/算成本账/嫌费率处理/月度回访…），
+   「场景」这一个维度装不下它们 —— 场景组因此被稀释得名不副实。
+   ★ 顺序即客户旅程顺序，前端按此顺序展示（不按数量排序）。
+   ★ 定义与 kb-stage.js 的提示词共用这一份，改这里就够。 */
+const STAGES = [
+  ['获客开发', '找到并接触新客户：陌拜、电销、抄号码、发单页、名单筛选、渠道开发'],
+  ['首次接触', '第一次有效沟通：第一通电话、开场、寒暄、先聊行业不直接谈产品、引导测额'],
+  ['需求判断', '判断能不能做、值不值得跟：问用途/金额/时间、核实征信与资质、看风险点、筛行业'],
+  ['约见推进', '把沟通推进到见面、把流程往前推：当天约、约不到就上门、持续约时间、催进度'],
+  ['异议处理', '客户提出抗拒：嫌费率高/利息高、说暂时不需要、说先考虑一下、反复拖延'],
+  ['签约落地', '走到签约与手续环节：签约核查、办房本、转他项、资料补正、合同面签'],
+  ['批款后服务', '批款/放款之后的动作：到账致电、批款后几天内跟进、出额后处理利息异议'],
+  ['关系维护', '不带业绩目的的长期保温：月度回访、节日送礼、朋友圈互动、闲聊、老客户背书'],
+];
+const STAGE_NAMES = STAGES.map(function (s) { return s[0]; });
+
 /* 整条值就是"没问出来"的说明 → 标 missing。
    注意必须锚定整条：像「他提到客户都是新客户，未说明对老客户是否适用」里
    虽然含"未说明"，但那是**有效的失效边界**，不能判成缺失。 */
 const MISSING_RE = /^[（(]?\s*(?:访谈中)?未(?:提到|展开|覆盖|留下原话|明确|说明|提供|形成)[^）)]*[）)]?$/;
 
+/**
+ * 报告主题 → 场景组名。
+ *
+ * @deprecated 2026-10-12 起 buildKb **不再调用它**。这正是当初出错的地方：
+ *   按「报告主题」归并，会迫使一份报告里所有做法都跟着标题走 ——
+ *   「棱镜签约」主题下于是混进了大量通用招式（实测 69 张卡里只有 11 张能自证归属）。
+ *   现在的判据落在卡片自身，走 sceneOf()。
+ *   保留它只是为了 tests/tmp 里的历史对比探针（topic-purity / kb-coverage）还能跑。
+ */
 function normTopic(raw) {
   const t = String(raw || '').trim();
   for (let i = 0; i < TOPIC_GROUPS.length; i++) {
     if (TOPIC_GROUPS[i][1].test(t)) return TOPIC_GROUPS[i][0];
   }
   return t || '未分类';
+}
+
+/* 卡片文本 → 场景组名。命中不了返回 null（=这条做法与具体场景无关）。
+   ★ 这是把归并判据从「报告主题」搬到「卡片自身」的关键一步。 */
+function sceneOf(text) {
+  const t = String(text || '');
+  for (let i = 0; i < TOPIC_GROUPS.length; i++) {
+    if (TOPIC_GROUPS[i][1].test(t)) return TOPIC_GROUPS[i][0];
+  }
+  return null;
+}
+
+/* 卡片的全部文本（标题 + 正文 + 要素值 + 原话）—— 判据与检索都用它 */
+function cardText(c) {
+  const parts = [c.title, c.body];
+  Object.keys(c.fields || {}).forEach(function (k) { parts.push(c.fields[k]); });
+  (c.quotes || []).forEach(function (q) { parts.push(q); });
+  return parts.join(' ');
 }
 
 function sectionKey(title) {
@@ -221,23 +270,29 @@ function clampText(s, n) {
 }
 
 /**
- * 入口。rows 为数据库行（只需 5 个字段，多余的会被忽略 —— 这点由调用方保证）。
- * @returns {{generated_at, stats, topics, cards, field_labels}}
+ * 入口。rows 为数据库行（只需 6 个字段，多余的会被忽略 —— 这点由调用方保证）。
+ * @returns {{generated_at, stats, field_labels, stage_names, topics, stages, cases, cards}}
+ *   topics = 场景索引（卡片级，按做法数排序）
+ *   stages = 动作索引（卡片级，按客户旅程顺序）
+ *   cases  = 每份报告的结果/关键判断/踩坑摘要（与归类无关，保证一份都不丢）
  */
 function buildKb(rows, opts) {
   const list = Array.isArray(rows) ? rows : [];
   const maskWords = (opts && opts.maskWords) || [];
-  const byTopic = {};
+  const caseMap = {};                       // report_id → 案例摘要（结果/关键判断/踩坑）
+  const sceneMap = {};                      // 场景 → { name, cards, ids:{} }
+  const stageMap = {};                      // 阶段 → { name, cards, ids:{} }
   const all = [];
 
   list.forEach(function (row) {
     const id = Number(row.id) || 0;
     const rawTopic = String(row.topic || '').trim();
-    const group = normTopic(rawTopic);
     const date = String(row.created_at || '').slice(0, 10);
     const secs = splitSections(row.report_md);
 
-    const bucket = byTopic[group] || (byTopic[group] = { name: group, cards: [], cases: [] });
+    /* 分类结果：jsonb 数组，与下面 cards 的**下标对齐**。
+       没跑过分类的行这里是 []，卡片就退回关键词判定（stage 为空）。 */
+    const labels = Array.isArray(row.kb_stages) ? row.kb_stages : [];
 
     /* 优先用「可复制的经验点」（结构化）；没有才退回「核心做法」（旧报告） */
     let cards = [];
@@ -253,11 +308,33 @@ function buildKb(rows, opts) {
     }
 
     cards.forEach(function (c, i) {
+      const lab = labels[i] || {};
+      const modelScene = String(lab.scene || '').trim();
+      const kwScene = sceneOf(cardText(c));
+
+      /* ★ 场景归属：模型判定优先（它看的是这张做法**本身**），没有就退回关键词；
+         模型判「通用」时 scene 置空但记下 scene_by='model' —— 这样前端能区分
+         「判定为通用」与「压根还没分类」两件事。 */
+      let scene = null;
+      let sceneBy = null;
+      if (modelScene) {
+        sceneBy = 'model';
+        scene = modelScene === GENERIC_SCENE ? null : modelScene;
+      } else if (kwScene) {
+        scene = kwScene;
+        sceneBy = 'keyword';
+      }
+
+      const stage = STAGE_NAMES.indexOf(String(lab.stage || '').trim()) >= 0
+        ? String(lab.stage).trim() : null;
+
       const card = {
         key: id + '-' + (i + 1),
         report_id: id,
-        topic: group,
-        topic_raw: rawTopic,
+        scene: scene,
+        scene_by: sceneBy,
+        stage: stage,
+        source_topic: rawTopic,
         grade: c.grade,
         title: c.title,
         body: c.body,
@@ -275,11 +352,28 @@ function buildKb(rows, opts) {
           card.missing.push(f[0]);
         }
       });
-      bucket.cards.push(card);
+
+      /* ★ 占位卡不进索引：访谈没问出任何做法时，报告里会留一条
+         「（访谈中未展开——……）」的诚实兜底。它是**空缺的证据**，不是做法 ——
+         留在 all 里（「全部做法」视图仍能看到这个缺口），但别让它带上
+         「需求判断 / 通用」这种标签混进阶段索引，那会凭空给知识库添一条假经验。
+         判据直接复用 MISSING_RE（它本来就是"整条就是没问出来"的锚定式判定）。 */
+      const placeholder = MISSING_RE.test(String(c.title || '').trim());
+
+      if (scene && !placeholder) {
+        const b = sceneMap[scene] || (sceneMap[scene] = { name: scene, cards: [], ids: {} });
+        b.cards.push(card);
+        b.ids[id] = 1;
+      }
+      if (stage && !placeholder) {
+        const b = stageMap[stage] || (stageMap[stage] = { name: stage, cards: [], ids: {} });
+        b.cards.push(card);
+        b.ids[id] = 1;
+      }
       all.push(card);
     });
 
-    bucket.cases.push({
+    caseMap[id] = {
       id: id,
       topic: rawTopic,
       rounds: Number(row.round_count) || 0,
@@ -289,27 +383,63 @@ function buildKb(rows, opts) {
       result: clampText(secs.result, 160),
       judgment: clampText(secs.judgment, 200),
       pitfalls: clampText(secs.pitfalls, 200),
-    });
+    };
   });
 
-  const topics = Object.keys(byTopic).map(function (k) { return byTopic[k]; })
-    .sort(function (a, b) {
-      return (b.cards.length - a.cards.length) || (b.cases.length - a.cases.length) || a.name.localeCompare(b.name);
-    });
+  /* 场景索引：按做法数排序（用户是"我想看这个场景怎么做"，多的排前面） */
+  const topics = Object.keys(sceneMap).map(function (k) {
+    const b = sceneMap[k];
+    b.cases = Object.keys(b.ids).map(function (id) { return caseMap[id]; }).filter(Boolean);
+    delete b.ids;
+    return b;
+  }).sort(function (a, b) {
+    return (b.cards.length - a.cards.length) || (b.cases.length - a.cases.length) || a.name.localeCompare(b.name);
+  });
+
+  /* 动作索引：★ 按客户旅程顺序，**不按数量排序** —— 顺序本身就是信息 */
+  const stages = STAGE_NAMES.map(function (name) {
+    const b = stageMap[name];
+    if (!b) return null;
+    b.cases = Object.keys(b.ids).map(function (id) { return caseMap[id]; }).filter(Boolean);
+    delete b.ids;
+    return b;
+  }).filter(Boolean);
+
+  /* ★ 顶层 cases：把「结果 / 关键判断 / 踩过的坑」摘要单独发一份。
+     为什么必须有：改成卡片级双维度后，案例摘要原本只挂在 topics[].cases 与
+     stages[].cases 里 —— 一份**没有任何卡片归入场景或阶段**的报告（还没跑分类、
+     或报告里只有占位卡）就会整份从输出里消失，那节内容等于被吞掉。
+     这与「通用招式不该被硬塞进某个主题」是两件事：摘要归报告、归类归卡片。 */
+  const cases = Object.keys(caseMap).map(function (id) { return caseMap[id]; });
 
   const out = {
     generated_at: new Date().toISOString(),
     field_labels: FIELD_LABELS,
+    stage_names: STAGE_NAMES,
     stats: {
       reports: list.length,
       topics: topics.length,
+      stages: stages.length,
       cards: all.length,
       full: all.filter(function (c) { return c.grade === 'full'; }).length,
       basic: all.filter(function (c) { return c.grade === 'basic'; }).length,
       quoted: all.filter(function (c) { return c.quotes.length; }).length,
+      scened: all.filter(function (c) { return c.scene; }).length,
+      staged: all.filter(function (c) { return c.stage; }).length,
+      /* ★「模型判定为通用」= 模型判过（scene_by=model）但没给具体场景。
+         不能只写 scene_by==='model' —— 那会把模型判的**具体场景**也算进来，
+         名字叫 generic 却数了「判过」的卡，对账时必错。 */
+      generic: all.filter(function (c) { return c.scene_by === 'model' && !c.scene; }).length,
+      /* 分类覆盖率：模型判过的卡片数（含判为具体场景的），用来看补跑进度 */
+      classified: all.filter(function (c) { return c.scene_by === 'model' || !!c.stage; }).length,
+      /* 占位卡（访谈没问出做法，报告留的空缺说明）——它们不进索引，
+         所以 stages/topics 索引里的做法数加起来会少于 cards，这个数字用于对账。 */
+      placeholder: all.filter(function (c) { return MISSING_RE.test(String(c.title || '').trim()); }).length,
       masked: maskWords.length,
     },
     topics: topics,
+    stages: stages,
+    cases: cases,
     cards: all,
   };
   return maskWords.length ? scrubDeep(out, maskWords) : out;
@@ -318,9 +448,14 @@ function buildKb(rows, opts) {
 module.exports = {
   buildKb: buildKb,
   normTopic: normTopic,
+  sceneOf: sceneOf,
+  cardText: cardText,
   splitSections: splitSections,
   scrubDeep: scrubDeep,
   FIELDS: FIELDS,
+  STAGES: STAGES,
+  STAGE_NAMES: STAGE_NAMES,
+  GENERIC_SCENE: GENERIC_SCENE,
   FIELD_LABELS: FIELD_LABELS,
   TOPIC_GROUPS: TOPIC_GROUPS,
   MISSING_RE: MISSING_RE,

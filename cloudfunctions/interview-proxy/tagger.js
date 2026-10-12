@@ -237,7 +237,21 @@ function normalizeTagResult(parsed) {
 
 /* ───────────────────── 调用 DeepSeek ───────────────────── */
 
-function callDeepseek(apiKey, prompt, model) {
+/**
+ * 调 DeepSeek。
+ *
+ * @param {string} apiKey
+ * @param {string} prompt
+ * @param {string} model
+ * @param {number} maxTokens  覆盖默认预算
+ * @param {object} opts       { raw: true } 时**不做空内容判定**，
+ *        把 { content, reasoning, finish_reason, usage, model } 原样返回 ——
+ *        给诊断探针用（要看清「预算是不是被推理吃光」，就必须拿到 finish_reason
+ *        和 usage.reasoning_tokens；光看一句 tag_empty_content 定位不了）。
+ */
+function callDeepseek(apiKey, prompt, model, maxTokens, opts) {
+  /* ★ 变量名不能叫 raw —— http 回调里有 `let raw = ""`（响应原文）会把它遮蔽掉 */
+  const rawMode = !!(opts && opts.raw);
   return new Promise(function (resolve, reject) {
     const body = JSON.stringify({
       model: model,
@@ -249,8 +263,9 @@ function callDeepseek(apiKey, prompt, model) {
          （reasoning_tokens=1600，completion_tokens=1600，content 为空字符串），
          finish_reason 返回 length，打标静默失败。
          打标本身的输出只有几十个 token，但推理长度随报告长度增长，
-         所以这里给足 4000，并在下面把「推理占满」当成可重试的失败处理。 */
-      max_tokens: 4000,
+         所以这里给足 4000，并在下面把「推理占满」当成可重试的失败处理。
+         maxTokens 可由调用方覆盖（kb-stage 也走这里，避免两份 https 实现漂移）。 */
+      max_tokens: Number(maxTokens) > 0 ? Math.trunc(Number(maxTokens)) : 4000,
       temperature: 0.2,
       stream: false,
     });
@@ -265,7 +280,11 @@ function callDeepseek(apiKey, prompt, model) {
           Authorization: "Bearer " + apiKey,
           "Content-Length": Buffer.byteLength(body),
         },
-        timeout: 60000,
+        /* ★ socket 超时必须可调：打标是短任务，60s 够；但 kb-stage 的分类
+           实测推理能到 4000–8000 token，一次调用 50s 上下 —— 预算再放宽就顶到
+           60s 这个旧上限，报出来的是 tag_timeout，会被误当成"网络抖动"。
+           调用方通过 opts.timeoutMs 传（见 kb-stage 的 STAGE_TIMEOUT_MS）。 */
+        timeout: Number(opts && opts.timeoutMs) > 0 ? Math.trunc(Number(opts.timeoutMs)) : 60000,
       },
       function (res) {
         let raw = "";
@@ -279,7 +298,19 @@ function callDeepseek(apiKey, prompt, model) {
           try {
             const parsed = JSON.parse(raw);
             const choice = (parsed.choices && parsed.choices[0]) || {};
-            const content = (choice.message && choice.message.content) || "";
+            const msg = choice.message || {};
+            const content = msg.content || "";
+            /* 探针模式：原样返回，包含 finish_reason 与 usage —— 诊断「推理吃光预算」必需 */
+            if (rawMode) {
+              resolve({
+                content: content,
+                reasoning: msg.reasoning_content || msg.reasoning || "",
+                finish_reason: choice.finish_reason || "",
+                usage: parsed.usage || null,
+                model: parsed.model || model,
+              });
+              return;
+            }
             /* 推理模型的典型失败形态：预算被推理吃光，content 是空串，
                finish_reason=length。这必须当成错误抛出去，
                否则调用方会把「什么都没打上」当成正常结果静默写库。 */
@@ -363,4 +394,7 @@ module.exports = {
   normalizeTagResult: normalizeTagResult,
   tagReport: tagReport,
   DEFAULT_MODEL: DEFAULT_MODEL,
+  /* 底层 chat 调用。kb-stage.js 复用它，避免两份 https 实现各自漂移
+     （超时、推理吃预算的判定、错误码命名都会不一致）。 */
+  callDeepseek: callDeepseek,
 };

@@ -38,6 +38,7 @@ const tagger = require("./tagger");
 const asr = require("./asr");
 const aiEditor = require("./ai-editor");
 const kb = require("./kb");
+const kbStage = require("./kb-stage");
 
 /**
  * CORS 由 CloudBase 网关统一注入。
@@ -983,6 +984,121 @@ function handleAdmin(req, res) {
         return;
       }
 
+      /* ── 知识库分类：动作阶段（客户旅程八阶段）+ 场景 ──
+         起因：原先卡片按「报告主题」归并，一份报告只要求标题带"棱镜"，
+         它下面所有做法就被塞进棱镜组。实测 69 张卡仅 11 张能自证归属。
+         改法：一次调用同时判 stage + scene，结果落 kb_stages（与卡片下标对齐）。
+
+         与 retag 同一套模式：派生数据、可覆盖、kb_stages_at IS NULL 筛选补跑。
+         ★ 小批量：一份报告串行调一次模型，云函数硬超时 60s —— limit 默认 3，分轮跑。 */
+      if (action === "kb_stage") {
+        const apiKey = env("DEEPSEEK_API_KEY", "");
+        if (!apiKey) {
+          sendJson(res, 500, { error: "server_not_configured" });
+          return;
+        }
+        const id = Math.trunc(Number(body.id) || 0);
+        const force = body.force === true;
+        const limit = Math.min(20, Math.max(1, Math.trunc(Number(body.limit) || 3)));
+
+        const COLS = "select=id,report_md,topic";
+        const query = id
+          ? COLS + "&id=eq." + id + "&limit=1"
+          : (force
+              ? COLS + "&order=id.asc&limit=" + limit
+              : COLS + "&kb_stages_at=is.null&order=id.asc&limit=" + limit);
+
+        pgRequest("GET", query, null).then(function (r) {
+          if (!r.ok) {
+            sendJson(res, 502, { error: "db_read_failed", status: r.status });
+            return;
+          }
+          const rows = Array.isArray(r.data) ? r.data : [];
+          if (!rows.length) {
+            sendJson(res, 200, { ok: true, staged: 0, results: [] });
+            return;
+          }
+
+          /* ── 探针模式：只调模型、看 finish_reason/usage，**不写任何库** ──
+             分类失败有三种成因（推理吃光预算 / 没按格式输出 / 锚不上），
+             靠业务层那一句错误分不清。探针把区别摆出来，是排障的第一个取证物。
+             用法：{"action":"kb_stage","id":5,"probe":true,"maxTokens":4000} */
+          if (body.probe === true) {
+            const probeRow = rows[0];
+            const probeCards = kb.buildKb([probeRow], {}).cards;
+            /* ★ 别写 Math.max(256, Number(x)||0)：没有 maxTokens 时它会把「未指定」
+               夹成 256，探针就成了「永远撞 length」。未指定就该原样交给默认值。 */
+            const wantTok = Math.trunc(Number(body.maxTokens) || 0);
+            const budget = wantTok > 0 ? Math.min(32000, Math.max(256, wantTok)) : 0;
+            kbStage
+              .probeCards(probeCards, { topic: probeRow.topic },
+                { apiKey: apiKey, maxTokens: budget })
+              .then(function (p) { sendJson(res, 200, { ok: true, id: probeRow.id, probe: p }); })
+              .catch(function (e) {
+                sendJson(res, 500, { error: String((e && e.message) || e).slice(0, 200) });
+              });
+            return;
+          }
+          /* 串行跑：并发会同时占多个 DeepSeek 连接，且 256MB 实例没必要抢 */
+          let done = 0;
+          const results = [];
+          const next = function (i) {
+            if (i >= rows.length) {
+              sendJson(res, 200, { ok: true, staged: done, total: rows.length, results: results });
+              return;
+            }
+            const row = rows[i];
+            const cards = kb.buildKb([row], {}).cards;
+
+            /* 没有可分类的卡片（报告里一条做法都没抽出来）：
+               直接标成已分类但空数组，免得每轮都被 kb_stages_at IS NULL 再捞一遍。 */
+            const stamp = new Date().toISOString();
+            if (!cards.length) {
+              pgRequest("PATCH", "id=eq." + row.id,
+                { kb_stages: [], kb_stages_at: stamp }).then(function () {
+                results.push({ id: row.id, cards: 0, note: "no_cards" });
+                next(i + 1);
+              });
+              return;
+            }
+
+            kbStage
+              .classifyCards(cards, { topic: row.topic }, { apiKey: apiKey, retries: 0 })
+              .then(function (out) {
+                /* 一条都没对上 = 模型没按格式输出，当成失败，不写库（下轮会重试） */
+                if (out.parse_failed) throw new Error("stage_parse_failed");
+                return pgRequest("PATCH", "id=eq." + row.id, {
+                  kb_stages: out.labels,
+                  kb_stages_at: new Date().toISOString(),
+                  kb_stages_model: out.stages_model,
+                }).then(function (w) {
+                  if (w.ok) {
+                    done++;
+                    results.push({
+                      id: row.id,
+                      cards: cards.length,
+                      matched: out.matched,
+                      dropped: out.dropped,
+                      anchored: out.anchored,
+                      positional: out.positional,
+                      stages: out.labels.map(function (x) { return x ? x.stage : null; }),
+                      scenes: out.labels.map(function (x) { return x ? (x.scene || "通用") : null; }),
+                    });
+                  } else {
+                    results.push({ id: row.id, error: "write_failed_" + w.status });
+                  }
+                });
+              })
+              .catch(function (e) {
+                results.push({ id: row.id, error: String((e && e.message) || e) });
+              })
+              .then(function () { next(i + 1); });
+          };
+          next(0);
+        });
+        return;
+      }
+
       /* ── AI 辅助修改报告（生成补丁，不写库）──
          人话说的「把结果节的 30% 改成 32%」「补一句这客户是老客户转介绍」，
          由模型翻译成结构化补丁回给前端。这里**刻意不写库**：
@@ -1569,7 +1685,11 @@ function handleKb(req, res) {
   }
   pgRequest(
     "GET",
-    "select=id,created_at,topic,round_count,report_md,interviewee_name,backend_owner_name" +
+    /* ★ 白名单列：绝不碰 transcript / interviewee_um / city / submitter_name / backend_owner_org。
+       interviewee_name / backend_owner_name 只取出当 maskWords（报告原话里带归属标注要替换掉），
+       不随卡片下发（kb.js 的 scrubDeep 会在输出前把它们抹成「该顾问」）。
+       kb_stages 是派生分类（与卡片下标对齐的 [{stage,scene}]），非敏感，可下发。 */
+    "select=id,created_at,topic,round_count,report_md,interviewee_name,backend_owner_name,kb_stages" +
       "&order=id.asc&limit=500",
     null
   )

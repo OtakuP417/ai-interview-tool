@@ -26,6 +26,7 @@ const adm = fs.readFileSync(path.join(ROOT, 'web', 'admin.html'), 'utf8');
 const kbHtml = fs.readFileSync(path.join(ROOT, 'web', 'kb.html'), 'utf8');
 const srv = fs.readFileSync(path.join(ROOT, 'cloudfunctions', 'interview-proxy', 'index.js'), 'utf8');
 const KB = require(path.join(ROOT, 'cloudfunctions', 'interview-proxy', 'kb.js'));
+const kbSrc = fs.readFileSync(path.join(ROOT, 'cloudfunctions', 'interview-proxy', 'kb.js'), 'utf8');
 
 /* ══════════════════════════════════════════════════════════════
    夹具。刻意做成"两种格式变体 + 一份旧模板 + 一份垃圾主题"，
@@ -132,20 +133,32 @@ const ROWS = [
 
 const MASK = [NAME_A, NAME_B, OWNER_A, OWNER_B, '第五柔'];
 
-console.log('\n[1] 解析：主题归并 / 两种格式变体 / 六要素');
+console.log('\n[1] 解析：归并规则 / 两种格式变体 / 六要素');
 {
   const out = KB.buildKb(ROWS, { maskWords: MASK.slice() });
 
   ok(out.stats.reports === 3, 'reports 计数', JSON.stringify(out.stats));
 
-  /* 主题归并：两份散乱主题各归到一个组，第三份不被规则命中就保留原主题 */
-  const names = out.topics.map((t) => t.name);
-  ok(names.indexOf('客户转介绍') >= 0, '「存量客户转介绍怎么做」归并到「客户转介绍」', names.join(' / '));
-  ok(names.indexOf('转化率提升') >= 0, '「提升转化率的做法」归并到「转化率提升」');
-  ok(names.indexOf('某个没被归并规则覆盖的主题') >= 0, '未命中规则的主题保留原文，不强行归类');
+  /* 归并规则本身还在，但它现在只作用于**卡片文本**（sceneOf），
+     不再作用于报告主题 —— 报告主题以原文出现在 source_topic 上。
+     ★ 这是 2026-10-12 修的那件事：判据从「报告主题」搬到「卡片自身」。 */
+  ok(KB.sceneOf('存量客户转介绍怎么做') === '客户转介绍',
+    '归并规则：「存量客户转介绍怎么做」→「客户转介绍」');
+  ok(KB.sceneOf('提升转化率的做法') === '转化率提升', '「提升转化率的做法」→「转化率提升」');
+  ok(KB.sceneOf('某个没被归并规则覆盖的主题') === null,
+    '未命中规则的文本不强行归类（返回 null = 通用）');
+  ok(typeof KB.normTopic === 'function', 'normTopic 仍导出（仅供历史对比探针，buildKb 已不用它）');
+  /* ★ 反向断言：buildKb 函数体里不许再出现 normTopic —— 一旦回归，
+     整份报告的做法又会被标题带着走。 */
+  const buildBody = (kbSrc.match(/function buildKb\(rows, opts\) \{[\s\S]*?\n\}/) || [''])[0];
+  ok(buildBody.length > 0 && buildBody.indexOf('normTopic') < 0,
+    '★ buildKb 不再调用 normTopic（归并判据已落到卡片自身）');
 
-  const t101 = out.topics.filter((t) => t.name === '客户转介绍')[0];
-  const t102 = out.topics.filter((t) => t.name === '转化率提升')[0];
+  /* 卡片按 report_id 取 —— 不再经主题组中转 */
+  const cardsOf = (id) => out.cards.filter((c) => c.report_id === id);
+  const caseOf = (id) => out.cases.filter((c) => c.id === id)[0];
+  const t101 = { cards: cardsOf(101) };
+  const t102 = { cards: cardsOf(102) };
 
   /* 有「可复制的经验点」时优先用它，「核心做法」不再产出卡片（否则同一做法出两遍） */
   ok(t101.cards.length === 2, 'skills 段优先：出 2 张全要素卡片', String(t101.cards.length));
@@ -189,23 +202,168 @@ console.log('\n[1] 解析：主题归并 / 两种格式变体 / 六要素');
   ok(c2.quotes.length === 0, '缺失说明里的括号内容不当原话');
 
   /* case 层：轮次 / 日期 / 旧模板标记 / 结果文本 */
-  const case101 = t101.cases[0];
+  const case101 = caseOf(101);
+  ok(!!case101, '顶层 cases 里有 101 的摘要');
   ok(case101.rounds === 18, 'case.rounds 取 round_count');
   ok(case101.date === '2026-10-11', 'case.date 取 created_at 前 10 位', case101.date);
   ok(case101.old_template === false, '10 月的报告不标早期模板');
-  ok(t102.cases[0].old_template === true, '9/20 的报告标早期模板（< 09-30）');
+  ok(caseOf(102).old_template === true, '9/20 的报告标早期模板（< 09-30）');
   ok(case101.result && case101.result.indexOf('3 个客户') >= 0, 'case.result 取自「结果」节');
 
-  /* 第 3 份没有做法，仍要出现在主题索引里（不能整份丢掉） */
-  const t103 = out.topics.filter((t) => t.name === '某个没被归并规则覆盖的主题')[0];
-  ok(t103 && t103.cards.length === 0 && t103.cases.length === 1,
-    '没有做法的报告也留在主题索引里（只是 0 条做法）');
+  /* ★ 回归防护：改成卡片级归类后，摘要曾一度只能从 topics[].cases / stages[].cases
+     抵达 —— 一份没有卡片归入场景或阶段的报告（还没跑分类 / 只有占位卡）
+     就会整份从输出里消失。顶层 cases 保证一份都不丢。 */
+  ok(out.cases.length === 3, '★ 顶层 cases 收齐全部 3 份报告的摘要', String(out.cases.length));
+  ok(cardsOf(103).length === 0 && !!caseOf(103),
+    '★ 没有任何做法的报告，摘要仍然出现在输出里（不再被归类逻辑顺手吞掉）');
+  ok(caseOf(103) && caseOf(103).topic === '某个没被归并规则覆盖的主题',
+    'case.topic 用报告主题原文，不再被归并');
+  ok(out.cards.every((c) => typeof c.source_topic === 'string' && c.source_topic.length > 0),
+    '每张卡都带 source_topic（来源访谈主题）');
 
   /* 节标题别名：旧报告的「新人注意事项」等价于「新人容易踩的坑」 */
-  ok(t102.cases[0].pitfalls && t102.cases[0].pitfalls.indexOf('承诺批款') >= 0,
+  ok(caseOf(102).pitfalls && caseOf(102).pitfalls.indexOf('承诺批款') >= 0,
     '节标题别名「新人注意事项」被识别');
-  ok(t101.cases[0].pitfalls && t101.cases[0].pitfalls.indexOf('报价') >= 0,
+  ok(case101.pitfalls && case101.pitfalls.indexOf('报价') >= 0,
     '节标题「新人容易踩的坑」被识别');
+
+  /* ★ 占位卡：访谈没问出任何做法时，报告里会留一条「（访谈中未展开——…）」的
+     诚实兜底。它是**空缺的证据**，不是做法 —— 留在 cards 里，但不许进索引，
+     否则会凭空给知识库添一条带「需求判断/通用」标签的假经验。 */
+  const PH_TITLE = '（访谈中未展开——目前只问到客户的行业与资金缺口，未涉及任何具体跟进动作）';
+  const ph = KB.buildKb([{
+    id: 301,
+    created_at: '2026-10-12T12:00:00+08:00',
+    topic: '批款后的跟进与服务',
+    round_count: 3,
+    kb_stages: [{ stage: '需求判断', scene: '通用' }],
+    report_md: [
+      '背景与挑战', '客户做餐饮。', '',
+      '---SECTION---', '核心做法', '（本节不用旧模板）', '',
+      '---SECTION---', '可复制的经验点',
+      '1. 做法：' + PH_TITLE, '',
+      '---SECTION---', '关键判断与取舍', '（未覆盖）', '',
+      '---SECTION---', '结果', '（未覆盖）', '',
+      '---SECTION---', '新人容易踩的坑', '（未覆盖）', '',
+    ].join('\n'),
+  }], {});
+  ok(ph.cards.length === 1 && ph.cards[0].title === PH_TITLE,
+    '占位卡逐字解析出来了（用于下面几条断言的前置条件）', ph.cards[0] && ph.cards[0].title);
+  ok(ph.stats.placeholder === 1, 'stats.placeholder 如实计数', String(ph.stats.placeholder));
+  ok(ph.stages.length === 0, '★ 占位卡不进阶段索引（不给知识库添一条假经验）');
+  ok(ph.topics.length === 0, '占位卡也不进场景索引');
+  ok(ph.cases.length === 1, '但报告摘要仍在（缺口本身是要被看见的）');
+}
+
+console.log('\n[1b] ★ 双维度：动作阶段 + 场景（卡片级归并，不看报告主题）');
+{
+  /* 夹具刻意做成"报告主题是棱镜签约，但里面的做法大多是通用招式" ——
+     这正是用户 2026-10-12 指出的问题：棱镜主题下混着大量与棱镜无关的做法。 */
+  const secs = (arr) => arr.join('\n');
+  const R2 = [
+    {
+      id: 201,
+      created_at: '2026-10-12T10:00:00+08:00',
+      topic: '棱镜签约',
+      round_count: 12,
+      interviewee_name: NAME_A,
+      backend_owner_name: OWNER_A,
+      /* 服务端分类结果：与下面 3 张卡**按下标对齐** */
+      kb_stages: [
+        { stage: '异议处理', scene: '通用' },      /* 模型判通用 → scene 置空但记 scene_by */
+        { stage: '签约落地', scene: '棱镜签约' },  /* 真专属 → scene 保留 */
+        { stage: '约见推进', scene: '通用' },
+      ],
+      report_md: secs([
+        '背景与挑战', '客户要的是大额，普通额度不够。', '',
+        '---SECTION---', '核心做法', '（本节不用旧模板）', '',
+        '---SECTION---', '可复制的经验点',
+        '1. 做法：面谈嫌费率时，先打压再给「先用后结清」',
+        '   频次/时机：面谈当场',
+        '   话术/方法：原话是「你先用着，半年后提前结清只算实际用的天数」（' + NAME_A + '）',
+        '2. 做法：签约核查时逐一核对资料',
+        '   频次/时机：签约环节',
+        '   话术/方法：按清单逐项过一遍',
+        '3. 做法：约不到客户就直接上门',
+        '   频次/时机：约了两次没成之后',
+        '   话术/方法：到店门口等',
+        '',
+        '---SECTION---', '关键判断与取舍', '选了先谈费率再谈额度。', '',
+        '---SECTION---', '结果', '当月放款 2 件。', '',
+        '---SECTION---', '新人容易踩的坑', '不要在电话里报价。', '',
+      ]),
+    },
+    {
+      /* 第二份**没有 kb_stages**（还没跑过分类）→ 场景退回关键词判定 */
+      id: 202,
+      created_at: '2026-10-12T11:00:00+08:00',
+      topic: '客户转介绍',
+      round_count: 9,
+      report_md: secs([
+        '背景与挑战', '新客来源少。', '',
+        '---SECTION---', '核心做法', '（本节不用旧模板）', '',
+        '---SECTION---', '可复制的经验点',
+        '1. 做法：拿到转介绍电话后，第一次联系先报介绍人名字',
+        '   频次/时机：首次致电时',
+        '   话术/方法：原话是「是张哥让我联系您的」',
+        '',
+        '---SECTION---', '关键判断与取舍', '先报介绍人再谈需求。', '',
+        '---SECTION---', '结果', '当月成交 1 件。', '',
+        '---SECTION---', '新人容易踩的坑', '不要绕弯子。', '',
+      ]),
+    },
+  ];
+
+  const out = KB.buildKb(R2, { maskWords: [NAME_A, OWNER_A] });
+  const all = out.cards;
+  ok(all.length === 4, '两份共出 4 张卡', String(all.length));
+
+  ok(JSON.stringify(out.stage_names) === JSON.stringify(KB.STAGE_NAMES),
+    'stage_names 随输出下发（前端「按动作看」的标签来源）');
+  ok(KB.STAGE_NAMES.length === 8, '客户旅程八阶段', KB.STAGE_NAMES.join('/'));
+  ok(KB.STAGE_NAMES[0] === '获客开发' && KB.STAGE_NAMES[7] === '关系维护',
+    '八阶段顺序 = 客户旅程先后', KB.STAGE_NAMES.join(' > '));
+
+  const c0 = all[0], c1 = all[1], c2 = all[2], c3 = all[3];
+  /* ★ 场景不再等于报告主题：报告主题是「棱镜签约」，但第 0、2 条是通用招式 */
+  ok(c0.stage === '异议处理' && c0.scene === null && c0.scene_by === 'model',
+    '★ 模型判「通用」→ scene 置空、scene_by=model（与「没分类」区分开）',
+    JSON.stringify([c0.stage, c0.scene, c0.scene_by]));
+  ok(!c0.scene, '★ 棱镜签约主题下的通用做法**不再**被归进棱镜组');
+  ok(c1.stage === '签约落地' && c1.scene === '棱镜签约' && c1.scene_by === 'model',
+    '真专属的做法保留场景', JSON.stringify([c1.stage, c1.scene, c1.scene_by]));
+  ok(c2.stage === '约见推进', '第 3 条拿到自己的阶段（下标对齐没有漂移）', String(c2.stage));
+  ok(c0.source_topic === '棱镜签约', '卡片上保留源访谈主题（source_topic），但它不再决定归属');
+
+  /* 兜底路径：没跑过分类的行，场景退回关键词判定 */
+  ok(c3.stage === null, '没跑过分类 → stage 为空（不猜）');
+  ok(c3.scene === '客户转介绍' && c3.scene_by === 'keyword',
+    '没跑过分类时场景退回关键词判定', JSON.stringify([c3.scene, c3.scene_by]));
+
+  /* 索引 */
+  const stageNames = out.stages.map((s) => s.name);
+  const expect = KB.STAGE_NAMES.filter((n) => stageNames.indexOf(n) >= 0);
+  ok(JSON.stringify(stageNames) === JSON.stringify(expect),
+    '★ 动作索引按客户旅程顺序，不按做法数排序', stageNames.join(' > '));
+  ok(stageNames.every((n, i) => i === 0 ||
+      KB.STAGE_NAMES.indexOf(n) > KB.STAGE_NAMES.indexOf(stageNames[i - 1])),
+    '★ 动作索引逐项递增（严格客户旅程序，没被数量排序打乱）', stageNames.join(' > '));
+  const sceneNames = out.topics.map((t) => t.name);
+  ok(sceneNames.indexOf('棱镜签约') >= 0 && sceneNames.length === 2,
+    '场景索引只收真专属的（通用不进索引）', sceneNames.join(' / '));
+  ok(out.topics.filter((t) => t.name === '棱镜签约')[0].cards.length === 1,
+    '「棱镜签约」组里只有 1 条（不再被整份报告的做法灌满）');
+
+  /* 计数如实 */
+  ok(out.stats.staged === 3, 'stats.staged = 判出阶段的卡片数', String(out.stats.staged));
+  ok(out.stats.scened === 2, 'stats.scened = 有场景的卡片数', String(out.stats.scened));
+  ok(out.stats.generic === 2, 'stats.generic = 模型判为通用的卡片数', String(out.stats.generic));
+
+  /* 脱敏对新增字段同样生效 */
+  const blob = JSON.stringify(out);
+  [NAME_A, OWNER_A].forEach((w) => ok(blob.indexOf(w) < 0, '双维度结构里也不含「' + w + '」'));
+  ok(blob.indexOf('该顾问') >= 0, '原话后的归属标注仍被替换为「该顾问」');
+  ok(blob.indexOf('"interviewee_name"') < 0, '输出结构里没有姓名键');
 }
 
 console.log('\n[2] ★ 脱敏：输出 blob 里不许出现敏感字段（真跑，不看字面）');
@@ -259,7 +417,7 @@ console.log('\n[3] 服务端 /api/kb：白名单列 + 路由 + 405');
   const sel = ((kbFn || [''])[0].match(/select=([a-z_,]+)/) || [])[1] || '';
   const cols = sel.split(',').filter(Boolean);
   ok(cols.length > 0, '取到 handleKb 的 SELECT 列表', sel);
-  ['id', 'created_at', 'topic', 'round_count', 'report_md', 'interviewee_name', 'backend_owner_name']
+  ['id', 'created_at', 'topic', 'round_count', 'report_md', 'interviewee_name', 'backend_owner_name', 'kb_stages']
     .forEach((c) => ok(cols.indexOf(c) >= 0, 'SELECT 含 ' + c));
   ['transcript', 'interviewee_um', 'city', 'submitter_name', 'backend_owner_org', 'interviewee_position']
     .forEach((c) => ok(cols.indexOf(c) < 0, '★ SELECT 不含 ' + c));
@@ -281,7 +439,7 @@ console.log('\n[3] 服务端 /api/kb：白名单列 + 路由 + 405');
 
 console.log('\n[4] kb.html：页面契约');
 {
-  ok(/const KB_BUILD = 'v2026\.10\.12-b';/.test(kbHtml), 'KB_BUILD 已声明',
+  ok(/const KB_BUILD = 'v2026\.10\.12-c';/.test(kbHtml), 'KB_BUILD 已声明',
     (kbHtml.match(/KB_BUILD = '[^']*'/) || [''])[0]);
   ok(/\/api\/kb'/.test(kbHtml), 'KB_API 指向 /api/kb');
 
@@ -289,12 +447,28 @@ console.log('\n[4] kb.html：页面契约');
   ok(/本页已脱敏/.test(kbHtml), '头部有脱敏说明');
   ok(/不含被访谈人姓名、工号、所属机构与原始对话/.test(kbHtml), '脱敏说明写清了剔除了哪几类');
 
-  /* 两层结构：主题索引 + 做法卡片 */
-  ok(/function renderTopics\(\)/.test(kbHtml), '主题索引视图');
-  ok(/function renderTopicDetail\(name\)/.test(kbHtml), '主题详情视图');
+  /* 三视图：动作（主轴）/ 场景（辅轴）/ 全部 */
+  ok(/function renderStages\(\)/.test(kbHtml), '动作索引视图');
+  ok(/function renderStageDetail\(name\)/.test(kbHtml), '动作详情视图');
+  ok(/function renderTopics\(\)/.test(kbHtml), '场景索引视图');
+  ok(/function renderTopicDetail\(name\)/.test(kbHtml), '场景详情视图');
   ok(/function renderAll\(\)/.test(kbHtml), '全部做法视图');
   ok(/function cardHtml\(c\)/.test(kbHtml), '做法卡片渲染');
   ok(/早期报告 · 要素不全/.test(kbHtml), 'basic 档卡片带「早期报告」标记');
+
+  /* ★ 默认视图 = 按动作看，且动作索引不按数量排序（顺序本身是信息） */
+  ok(/let view = 'act';/.test(kbHtml), '默认视图是「按动作看」');
+  const stagesFn = kbHtml.match(/function renderStages\(\) \{[\s\S]*?\n\}/);
+  ok(!!stagesFn, '取到 renderStages 函数体');
+  ok(stagesFn && !/\.sort\(/.test(stagesFn[0]),
+    '★ 动作索引不做排序（沿用服务端的客户旅程顺序）');
+  const sortedFn = kbHtml.match(/function renderTopics\(\) \{[\s\S]*?\n\}/);
+  ok(sortedFn && !/\.sort\(/.test(sortedFn[0]),
+    '场景索引也不在页面重排（服务端已按做法数排好）');
+
+  /* 双维度标签：阶段必显示，场景为空就不显示（不许把「通用」当标签挂满页） */
+  ok(/tag act/.test(kbHtml), '阶段标签有独立样式类');
+  ok(!/esc\(c\.scene \|\| '通用'\)|>通用</.test(kbHtml), '★ 不在卡片上把「通用」渲染成标签');
 
   /* 缺失要素：full 档渲染「未问到」，不要把空白当内容 */
   ok(/未问到/.test(kbHtml), '全要素卡片缺项显示「未问到」');
@@ -307,13 +481,14 @@ console.log('\n[4] kb.html：页面契约');
   ok(!!cardFn, '取到 cardHtml 函数体');
   if (cardFn) {
     const body = cardFn[0];
-    ['c.title', 'c.body', 'c.topic', 'c.topic_raw', 'c.date'].forEach((v) => {
+    /* ★ 字段名以服务端为准：卡片上是 source_topic / scene / stage（2026-10-12 双维度改造） */
+    ['c.title', 'c.body', 'c.source_topic', 'c.scene', 'c.stage', 'c.date'].forEach((v) => {
       const p = v.replace('.', '\\.');
       const escN = (body.match(new RegExp('esc\\(' + p + '[\\s\\S]{0,20}?\\)', 'g')) || []).length;
       ok(escN >= 1, 'cardHtml 里 ' + v + ' 经 esc() 输出', escN + ' 处');
     });
     /* 反向：任何 `+ c.xxx` 形式的直接拼接都是漏转义 */
-    const leak = body.match(/\+ *(c\.(?:title|body|topic|topic_raw|date)\b)/g) || [];
+    const leak = body.match(/\+ *(c\.(?:title|body|source_topic|scene|stage|date)\b)/g) || [];
     ok(leak.length === 0, 'cardHtml 里没有绕过 esc() 的直接拼接', leak.join(' | '));
     ok(/esc\(FL\[k\]\)/.test(body), '要素名经 esc()');
     ok(/esc\(q\)/.test(body), '原话经 esc()');
@@ -354,7 +529,119 @@ console.log('\n[6] 版本号');
     (web.match(/APP_BUILD = '[^']*'/) || [''])[0]);
   ok(/ADMIN_BUILD = 'v2026\.10\.12-c'/.test(adm), '管理端 ADMIN_BUILD（加知识库入口后 bump）',
     (adm.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
-  ok(/KB_BUILD = 'v2026\.10\.12-b'/.test(kbHtml), '知识库 KB_BUILD（加同义词检索后 bump）');
+  ok(/KB_BUILD = 'v2026\.10\.12-c'/.test(kbHtml), '知识库 KB_BUILD（加双维度与「按动作看」后 bump）');
+}
+
+console.log('\n[8] ★ kb-stage.js：受约束输出 + 内容锚校验（两个已踩过的坑都要守住）');
+{
+  const stageSrc = fs.readFileSync(
+    path.join(ROOT, 'cloudfunctions', 'interview-proxy', 'kb-stage.js'), 'utf8');
+  const tagSrc = fs.readFileSync(
+    path.join(ROOT, 'cloudfunctions', 'interview-proxy', 'tagger.js'), 'utf8');
+  const ST = require(path.join(ROOT, 'cloudfunctions', 'interview-proxy', 'kb-stage.js'));
+
+  ok(ST.STAGE_NAMES.length === 8, '导出客户旅程八阶段', ST.STAGE_NAMES.join('/'));
+  ok(JSON.stringify(ST.STAGE_NAMES) === JSON.stringify(KB.STAGE_NAMES),
+    '阶段词表与 kb.js 共用一份定义（两处漂移会让索引和标签对不上）');
+  ok(ST.SCENE_NAMES.length === KB.TOPIC_GROUPS.length, '场景词表来自 TOPIC_GROUPS',
+    ST.SCENE_NAMES.length + ' vs ' + KB.TOPIC_GROUPS.length);
+  /* ★ 坑 1：预算不够时，这个任务的推理会把预算吃光（content 为空串、
+     finish_reason=length），业务层只看到「分类失败」。4000 不够、8000 仍有整份判不完的。
+     现在给到 16000，配套 socket 超时也要放宽（默认 60s 会先于预算触发）。 */
+  ok(ST.MAX_TOKENS >= 16000,
+    '★ 输出预算 ≥ 16000（实测推理 4000–8000+ token 起伏，给 4000 必被吃光）',
+    String(ST.MAX_TOKENS));
+  ok(ST.STAGE_TIMEOUT_MS > 60000,
+    '★ socket 超时随之放宽（大预算下 60s 会先触发 tag_timeout，被误判成网络抖动）',
+    String(ST.STAGE_TIMEOUT_MS));
+  ok(/timeoutMs: STAGE_TIMEOUT_MS/.test(stageSrc),
+    '分类与探针都显式传 timeoutMs');
+
+  /* ── 提示词契约 ── */
+  const p = ST.buildStagePrompt(
+    [{ title: '面谈嫌费率时，先打压再给「先用后结清」', fields: { when: '面谈当场' }, body: '' }],
+    { topic: '棱镜签约' });
+  /* ★ 坑 2：tagger.parseJsonLoose 显式拒绝数组（`!Array.isArray(v)`），
+     提示词若要求输出裸数组，解析恒为 null、matched 恒为 0 —— 首次上线就是这么挂的。 */
+  ok(/\{"items":\[/.test(p), '★ 提示词要求输出 {"items":[...]} 对象，不是裸数组');
+  ok(p.indexOf('绝大多数做法') >= 0 || p.indexOf('大多数做法是放之四海皆准的通用招式') >= 0,
+    '提示词明确说了多数做法是通用招式（给模型一个「别硬靠」的出口）');
+  ok(p.indexOf('宁可多选') >= 0, '提示词给了「宁可选通用」的取向');
+  ok(p.indexOf('不代表') >= 0, '★ 提示词交代「报告标题不代表每条做法都属于该场景」');
+  ok(p.indexOf('棱镜签约') >= 0, '报告主题作为背景写进提示词（但明确不许被它带跑）');
+  ok(String(p).indexOf(String.fromCharCode(96)) < 0,
+    '提示词里没有 markdown 反引号（会终止模板串 → Unexpected identifier）');
+  ST.STAGE_NAMES.forEach((n) => ok(p.indexOf(n) >= 0, '提示词列出阶段「' + n + '」'));
+  ST.SCENE_NAMES.forEach((n) => ok(p.indexOf(n) >= 0, '提示词列出场景「' + n + '」'));
+
+  /* ── 解析与对齐（真跑，用真实卡片形状） ── */
+  const cards = [
+    { title: '面谈嫌费率时，先打压再给「先用后结清」', fields: {}, body: '' },
+    { title: '签约核查时逐一核对资料', fields: {}, body: '' },
+    { title: '约不到客户就直接上门', fields: {}, body: '' },
+  ];
+  const mkItems = (fn) => JSON.stringify({ items: cards.map(fn) });
+  const good = mkItems((c, i) => ({
+    i: i, title: c.title.slice(0, 10), stage: ST.STAGE_NAMES[i], scene: i ? '通用' : '棱镜签约' }));
+  const r1 = ST.normalizeStageResult(ST.parseStageOutput(good), cards);
+  ok(r1.matched === 3 && r1.anchored === 3 && r1.dropped === 0,
+    '对象形态：3 条全部靠标题锚定', JSON.stringify(r1));
+
+  const bare = '先说两句\n' + JSON.stringify(cards.map((c, i) => ({
+    i: i, title: c.title.slice(0, 10), stage: ST.STAGE_NAMES[i], scene: '通用' })));
+  ok(ST.normalizeStageResult(ST.parseStageOutput(bare), cards).matched === 3,
+    '★ 裸数组（模型忽略格式要求时）也能解析');
+
+  /* ★ 下标与标题不一致 → 以标题为准（这类任务最易出的错是顺序错位） */
+  const mism = mkItems((c, pos) => {
+    const src = [2, 1, 0][pos];
+    return { i: pos, title: cards[src].title.slice(0, 10), stage: ST.STAGE_NAMES[src], scene: '通用' };
+  });
+  const r3 = ST.normalizeStageResult(ST.parseStageOutput(mism), cards);
+  ok(r3.anchored === 3, '★ 下标与标题冲突时按标题锚定（3 条全锚定）', JSON.stringify(r3));
+  ok(r3.labels[2] && r3.labels[2].stage === ST.STAGE_NAMES[2],
+    '★ 第 3 张卡拿到的是写着自己标题的那条结果（下标不可信）');
+  ok(r3.labels[0] && r3.labels[0].stage === ST.STAGE_NAMES[0], '第 1 张卡同样被纠正回来');
+
+  /* 位置兜底：标题抄歪时不至于整份丢弃 */
+  const bad = mkItems((c, i) => ({ i: i, title: '我乱写的标题' + i, stage: ST.STAGE_NAMES[1], scene: '通用' }));
+  const r4 = ST.normalizeStageResult(ST.parseStageOutput(bad), cards);
+  ok(r4.positional === 3 && r4.anchored === 0, '★ 标题抄歪 → 位置兜底生效', JSON.stringify(r4));
+
+  /* 宁缺毋滥：闭集外的值必须丢，不许塞猜的 */
+  const junk = JSON.stringify({ items: [
+    { i: 0, title: cards[0].title.slice(0, 10), stage: '乱写的阶段', scene: '乱写的场景' },
+    { i: 99, title: 'x', stage: ST.STAGE_NAMES[0], scene: '通用' },
+  ] });
+  const r5 = ST.normalizeStageResult(ST.parseStageOutput(junk), cards);
+  ok(r5.matched === 0 && r5.dropped === 2,
+    '★ 闭集外的阶段/场景与越界下标一律丢弃', JSON.stringify(r5));
+  ok(ST.normalizeStageResult(ST.parseStageOutput('我拒绝输出 JSON'), cards).matched === 0,
+    '垃圾输入不炸，返回全 null（调用方按失败处理）');
+  ok(ST.normalizeStageResult(ST.parseStageOutput(''), cards).labels.length === 3,
+    'labels 与 cards 同长（下标对齐的前提）');
+
+  ok(ST.titleMatches('面谈嫌费率时，先打压', '面谈嫌费率时先打压再给') === true,
+    '标题比对忽略标点差异');
+  ok(ST.titleMatches('约见推进', '获客开发') === false, '短标题不同就不认（防误粘）');
+
+  /* ── 服务端接线 ── */
+  ok(/action === "kb_stage"/.test(srv), 'index.js 有 kb_stage 动作');
+  ok(/kb_stages_at=is\.null/.test(srv), 'kb_stage 支持按「未分类」补跑');
+  ok(/kb_stages: out\.labels/.test(srv), '分类结果写回 kb_stages');
+  ok(/if \(out\.parse_failed\) throw new Error\("stage_parse_failed"\)/.test(srv),
+    '★ 一条都没对上时抛错、不写库（不把失败当成功）');
+  ok(/body\.probe === true/.test(srv), '有「只探测不写库」的探针出口（排障第一个取证物）');
+  ok(/retries: 0/.test(srv), '★ 函数内不重试（一次调用约 45s，重试必撞 60s 函数超时）');
+
+  /* tagger 提供原始返回，探针才拿得到 finish_reason / usage */
+  ok(/function callDeepseek\(apiKey, prompt, model, maxTokens, opts\)/.test(tagSrc),
+    'callDeepseek 签名带 maxTokens + opts');
+  ok(/opts && opts\.timeoutMs/.test(tagSrc),
+    'callDeepseek 的 socket 超时可由调用方覆盖');
+  ok(/opts && opts\.raw/.test(tagSrc) && /finish_reason: choice\.finish_reason/.test(tagSrc),
+    'tagger 支持 raw 模式（探针要 finish_reason/usage 才能区分三种失败成因）');
+  ok(/const rawMode = /.test(tagSrc), 'raw 标志改名避开 http 回调里的 raw（响应原文）遮蔽');
 }
 
 console.log('\n[7] 同义词检索（jsdom 真跑页面搜索，不看字面）');
@@ -367,19 +654,29 @@ console.log('\n[7] 同义词检索（jsdom 真跑页面搜索，不看字面）'
   const FX = {
     generated_at: 'fixture',
     field_labels: KB.FIELD_LABELS,
-    stats: { reports: 2, topics: 2, cards: 3, full: 3, basic: 0, quoted: 0, masked: 0 },
+    stage_names: KB.STAGE_NAMES,
+    stats: { reports: 2, topics: 2, stages: 1, cards: 3, full: 3, basic: 0, quoted: 0, masked: 0 },
     topics: [
       { name: '客户转介绍', cards: [], cases: [] },
       { name: '批款后的跟进与服务', cards: [], cases: [] },
     ],
+    /* ★ 默认视图已经改成「按动作看」，boot() 一进来就会渲染 stages ——
+       夹具缺这个键会让页面在 boot 阶段直接抛错（而且 [7] 只关心搜索，容易误判成搜索坏了）。 */
+    stages: [
+      { name: '获客开发', cards: [], cases: [] },
+    ],
+    cases: [],
     cards: [
-      { key: '1-1', report_id: 1, topic: '客户转介绍', topic_raw: '老客户转介绍', grade: 'full',
+      { key: '1-1', report_id: 1, scene: '客户转介绍', scene_by: 'model', stage: '获客开发',
+        source_topic: '老客户转介绍', grade: 'full',
         title: '回访时顺带问一句', body: '', fields: { how: '客户说手头紧、要周转' },
         missing: [], absent: [], quotes: [], date: '2026-10-01' },
-      { key: '1-2', report_id: 1, topic: '客户转介绍', topic_raw: '老客户转介绍', grade: 'full',
+      { key: '1-2', report_id: 1, scene: '客户转介绍', scene_by: 'model', stage: '获客开发',
+        source_topic: '老客户转介绍', grade: 'full',
         title: '晒批款记录', body: '', fields: { how: '把放款截图发到朋友圈' },
         missing: [], absent: [], quotes: [], date: '2026-10-01' },
-      { key: '2-1', report_id: 2, topic: '批款后的跟进与服务', topic_raw: '批款跟进', grade: 'full',
+      { key: '2-1', report_id: 2, scene: '批款后的跟进与服务', scene_by: 'model', stage: '批款后服务',
+        source_topic: '批款跟进', grade: 'full',
         title: '到账当天致电', body: '', fields: { how: '到账当天打电话' },
         missing: [], absent: [], quotes: [], date: '2026-10-02' },
     ],

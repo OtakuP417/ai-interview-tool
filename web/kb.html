@@ -101,6 +101,9 @@ main { padding: 18px 0 40px; }
   background: var(--accent-light); color: var(--accent-text);
 }
 .tag.old { background: var(--warning-light); color: var(--warning-text); }
+/* 动作阶段标签：与场景标签（蓝）区分开，用中性灰 —— 阶段是"每条都有"的主轴，
+   场景是"只有专属招式才有"的辅轴，视觉上不该抢主轴的位。 */
+.tag.act { background: var(--surface2); color: var(--text-muted); }
 .ctitle { font-size: 15.5px; font-weight: 600; line-height: 1.5; }
 .cbody { font-size: 13.5px; color: var(--text-muted); margin-top: 7px; }
 .fields { margin: 11px 0 0; padding: 0; border-top: 1px dashed var(--border); }
@@ -155,7 +158,8 @@ table.bd td:first-child { color: var(--text-muted); white-space: nowrap; }
     <div class="tools">
       <input id="q" type="search" placeholder="搜做法、话术、原话或主题…" autocomplete="off">
       <div class="seg">
-        <button id="v-topic" class="on">按主题看</button>
+        <button id="v-act" class="on">按动作看</button>
+        <button id="v-topic">按场景看</button>
         <button id="v-all">全部做法</button>
       </div>
     </div>
@@ -181,6 +185,9 @@ table.bd td:first-child { color: var(--text-muted); white-space: nowrap; }
       <b>访问边界的由来</b>：访谈端面向一线，凭链接即可填，所以不承载任何他人数据；管理端能看到姓名与对话原文，因此加口令；
       本页面向全体同事、凭链接即看，所以<b>在服务端就把姓名、工号、所属机构与原始对话全部剔除了</b> ——
       页面本身拿不到这些字段，不是靠前端隐藏。<br>
+      <b>做法怎么归类</b>：每条做法都带一个<b>动作阶段</b>（客户旅程八段，每条必有一个）和一个<b>场景</b>（只有专属招式才有）。
+      早先的版本按访谈主题归组，结果「棱镜签约」主题下混进了大量跟棱镜无关的通用招式，所以改成按做法本身归类 ——
+      挂不上具体场景的，就是通用招式，不再硬塞进某个主题。<br>
       <b>本页会怎么长</b>：新报告一归档就自动出现在这里，不需要人工整理。「早期报告」标记表示该条沿用旧模板，缺少话术/失效边界等要素。
     </div>
   </details>
@@ -188,12 +195,13 @@ table.bd td:first-child { color: var(--text-muted); white-space: nowrap; }
 </footer>
 
 <script>
-const KB_BUILD = 'v2026.10.12-b';
+const KB_BUILD = 'v2026.10.12-c';
 const KB_API = 'https://work-d1gs0jzrg2277d75e-1391683363.ap-shanghai.app.tcloudbase.com/api/kb';
 
 let KB = null;
-let view = 'topic';
-let topic = null;
+let view = 'act';   /* 默认「按动作看」：动作阶段是主轴（每条做法都有），场景是辅轴 */
+let topic = null;   /* 场景视图里选中的场景名 */
+let act = null;     /* 动作视图里选中的阶段名 */
 let kw = '';
 
 const $ = (id) => document.getElementById(id);
@@ -238,7 +246,10 @@ function termAlt(t) {
 }
 
 function hay(card) {
-  const parts = [card.title, card.body, card.topic, card.topic_raw].concat(card.quotes || []);
+  /* ★ 字段名对齐服务端：卡片上是 source_topic（源访谈主题）与 scene / stage。
+     旧写法 card.topic / card.topic_raw 已随 kb.js 的双维度改造改名（2026-10-12）。 */
+  const parts = [card.title, card.body, card.source_topic, card.scene, card.stage]
+    .concat(card.quotes || []);
   Object.keys(card.fields || {}).forEach(k => parts.push(card.fields[k]));
   return parts.join(' ').toLowerCase();
 }
@@ -276,12 +287,16 @@ function cardHtml(c) {
     ? '<div class="quotes"><div class="qh">访谈里的原话</div>'
       + c.quotes.map(q => '<q>' + esc(q) + '</q>').join('') + '</div>'
     : '';
-  const tags = '<span class="tag">' + esc(c.topic) + '</span>'
+  /* 标签行：动作阶段（主轴，每条都有）+ 场景（辅轴，只有专属招式才有）。
+     ★ 场景为空 = 模型判定为「通用」或还没跑过分类 —— 这时不显示场景标签，
+       而不是显示「通用」两个字，否则每张卡都挂一个「通用」会淹掉信息。 */
+  const tags = (c.stage ? '<span class="tag act">' + esc(c.stage) + '</span>' : '')
+    + (c.scene ? '<span class="tag">' + esc(c.scene) + '</span>' : '')
     + (c.grade === 'basic' ? '<span class="tag old">早期报告 · 要素不全</span>' : '');
   return '<div class="card"><div class="chead">' + tags + '</div>'
     + '<div class="ctitle">' + esc(c.title) + '</div>' + body
     + (rows ? '<dl class="fields">' + rows + '</dl>' : '') + quotes
-    + '<div class="src">来自《' + esc(c.topic_raw || c.topic) + '》的访谈'
+    + '<div class="src">来自《' + esc(c.source_topic || '未填主题') + '》的访谈'
     + (c.date ? ' · ' + esc(c.date) : '') + '</div></div>';
 }
 
@@ -289,7 +304,8 @@ function renderTopics() {
   const list = KB.topics.map(t => ({ t: t, n: t.cards.filter(match).length })).filter(x => x.n > 0);
   if (!list.length) return '<div class="empty">没有匹配的内容</div>';
   const max = Math.max.apply(null, list.map(x => x.n));
-  return '<div class="tgrid">' + list.map(x =>
+  return '<div class="sec-title">具体场景<span class="n">只有专属招式才归入场景，通用招式不在这里</span></div>'
+    + '<div class="tgrid">' + list.map(x =>
     '<div class="tcard" data-topic="' + esc(x.t.name) + '">'
     + '<div class="tname">' + esc(x.t.name) + '</div>'
     + '<div class="tmeta">' + x.n + ' 条做法 · ' + x.t.cases.length + ' 份访谈</div>'
@@ -299,10 +315,10 @@ function renderTopics() {
 
 function renderTopicDetail(name) {
   const t = KB.topics.filter(x => x.name === name)[0];
-  if (!t) return '<div class="empty">找不到该主题</div>';
+  if (!t) return '<div class="empty">找不到该场景</div>';
   const cards = t.cards.filter(match);
   const cases = t.cases.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  let html = '<button class="back" id="back">← 全部主题</button>'
+  let html = '<button class="back" id="back">← 全部场景</button>'
     + '<div class="sec-title">' + esc(t.name) + '<span class="n">' + cards.length + ' 条做法 · ' + t.cases.length + ' 份访谈</span></div>';
   html += cards.length ? cards.map(cardHtml).join('') : '<div class="empty">没有匹配的做法</div>';
 
@@ -320,6 +336,46 @@ function renderTopicDetail(name) {
   return html;
 }
 
+/* ── 按动作看：客户旅程八阶段 ──────────────────────────────
+   ★ 顺序就是服务端给的 stages 顺序（获客开发 → … → 关系维护），**不按做法数排序** ——
+     顺序本身就是信息：它是客户从陌生到成交再到老客户的推进路径。
+   场景索引可以按条数排（用户是"我想看这个场景怎么做"），阶段索引不行。 */
+function renderStages() {
+  const list = KB.stages.map(s => ({ s: s, n: s.cards.filter(match).length })).filter(x => x.n > 0);
+  if (!list.length) return '<div class="empty">没有匹配的内容</div>';
+  const max = Math.max.apply(null, list.map(x => x.n));
+  return '<div class="sec-title">客户旅程八阶段<span class="n">' + list.length + ' 个阶段有做法</span></div>'
+    + '<div class="tgrid">' + list.map(x =>
+      '<div class="tcard" data-stage="' + esc(x.s.name) + '">'
+      + '<div class="tname">' + esc(x.s.name) + '</div>'
+      + '<div class="tmeta">' + x.n + ' 条做法 · ' + x.s.cases.length + ' 份访谈</div>'
+      + '<div class="tbar"><i style="width:' + Math.round(x.n / max * 100) + '%"></i></div>'
+      + '</div>').join('') + '</div>';
+}
+
+function renderStageDetail(name) {
+  const s = KB.stages.filter(x => x.name === name)[0];
+  if (!s) return '<div class="empty">找不到该阶段</div>';
+  const cards = s.cards.filter(match);
+  const cases = s.cases.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  let html = '<button class="back" id="back">← 全部阶段</button>'
+    + '<div class="sec-title">' + esc(s.name)
+    + '<span class="n">' + cards.length + ' 条做法 · ' + s.cases.length + ' 份访谈</span></div>';
+  html += cards.length ? cards.map(cardHtml).join('') : '<div class="empty">没有匹配的做法</div>';
+  html += '<div class="sec-title">这些访谈里还说了什么<span class="n">结果、关键判断、踩过的坑</span></div>';
+  html += cases.map(c => {
+    const bits = [];
+    if (c.result) bits.push('<div class="one"><b>结果：</b>' + esc(c.result) + '</div>');
+    if (c.judgment) bits.push('<div class="one"><b>关键判断：</b>' + esc(c.judgment) + '</div>');
+    if (c.pitfalls && c.pitfalls.indexOf('未覆盖') < 0) bits.push('<div class="one"><b>踩过的坑：</b>' + esc(c.pitfalls) + '</div>');
+    return '<div class="case"><div class="ch">' + esc(c.topic || s.name) + '</div>'
+      + '<div class="cm">' + c.rounds + ' 轮 · ' + esc(c.date || '') + ' · ' + c.cards + ' 条做法'
+      + (c.old_template ? ' · 早期报告' : '') + '</div>'
+      + (bits.length ? '<div class="cb">' + bits.join('') + '</div>' : '') + '</div>';
+  }).join('');
+  return html;
+}
+
 function renderAll() {
   const cards = KB.cards.filter(match);
   if (!cards.length) return '<div class="empty">没有匹配的做法</div>';
@@ -330,21 +386,38 @@ function renderAll() {
 function render() {
   const m = $('main');
   if (view === 'all') m.innerHTML = renderAll();
+  else if (view === 'act') m.innerHTML = act ? renderStageDetail(act) : renderStages();
   else if (topic) m.innerHTML = renderTopicDetail(topic);
   else m.innerHTML = renderTopics();
 
   const b = $('back');
-  if (b) b.onclick = () => { topic = null; render(); };
-  if (view === 'topic' && !topic) {
+  if (b) b.onclick = () => { topic = null; act = null; render(); };
+  if (!topic && !act) {
     m.querySelectorAll('.tcard').forEach(el => {
-      el.onclick = () => { topic = el.getAttribute('data-topic'); render(); window.scrollTo(0, 0); };
+      el.onclick = () => {
+        if (el.hasAttribute('data-stage')) act = el.getAttribute('data-stage');
+        else topic = el.getAttribute('data-topic');
+        render();
+        window.scrollTo(0, 0);
+      };
     });
   }
 }
 
+/* 三个视图按钮互斥高亮 —— 逐个 classList.add/remove 容易漏一个，
+   统一走这里。 */
+function setView(v) {
+  view = v; topic = null; act = null;
+  ['v-act', 'v-topic', 'v-all'].forEach(id => {
+    $(id).classList.toggle('on', id === 'v-' + v);
+  });
+  render();
+}
+
 $('q').addEventListener('input', (e) => { kw = e.target.value.trim().toLowerCase(); render(); });
-$('v-topic').onclick = () => { view = 'topic'; topic = null; $('v-topic').classList.add('on'); $('v-all').classList.remove('on'); render(); };
-$('v-all').onclick = () => { view = 'all'; $('v-all').classList.add('on'); $('v-topic').classList.remove('on'); render(); };
+$('v-act').onclick = () => setView('act');
+$('v-topic').onclick = () => setView('topic');
+$('v-all').onclick = () => setView('all');
 
 (function boot() {
   $('stamp').textContent = '程序版本 ' + KB_BUILD;

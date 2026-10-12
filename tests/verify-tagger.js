@@ -137,7 +137,8 @@ ok('空报告直接拒绝',
 
 console.log('\n[5b] 推理预算吃光（真实踩过的坑）');
 const TAGSRC = fs.readFileSync(path.join(ROOT, 'cloudfunctions/interview-proxy/tagger.js'), 'utf8');
-ok('max_tokens 给到 4000（1600 被推理吃光过）', /max_tokens:\s*4000/.test(TAGSRC));
+ok('max_tokens 默认 4000（1600 被推理吃光过），且允许调用方覆盖（kb-stage 要更大预算）',
+   /max_tokens:\s*Number\(maxTokens\)\s*>\s*0\s*\?\s*Math\.trunc\(Number\(maxTokens\)\)\s*:\s*4000/.test(TAGSRC));
 ok('不再带 system 消息（把规则全放 user，省 token 也少一层歧义）',
    !/role:\s*"system"/.test(TAGSRC.slice(TAGSRC.indexOf('function callDeepseek'), TAGSRC.indexOf('function tagReport'))));
 ok('空 content 当错误抛，不静默返回空结果',
