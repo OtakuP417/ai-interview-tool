@@ -1,25 +1,32 @@
 # -*- coding: utf-8 -*-
 """
-生成「AI 访谈工具 · 三个入口」两张转发图（HTML 源 → 浏览器截图 PNG）
+生成「AI 访谈工具 · 三个入口」一张转发图（HTML 源 → 浏览器截图 PNG）
 
-两张图的分工（一张讲分工，一张给入口）：
-  · three-ends.png    = 三端说明图：三个入口各管什么、谁能看什么、为什么这样分
-  · three-ends-qr.png = 三端二维码入口图：三个码并排，扫哪个看你是什么角色
+一张图讲完两件事（2026-10-12 由「说明图 + 入口图」两张合并而来）：
+  · 谁能扫／扫哪个 —— 三个二维码并排
+  · 扫进去各看什么、能做什么 —— 每列自带职责要点
+
+合并时砍掉的重复项：页眉、页脚、三个列标题、三个角色名各只出现一次；
+说明图里「入口 index.html」那行与码下地址重复，删掉；微信语音录音那段提示删掉。
+独有内容保留：数据流向带、边界由来说明。
 
 与 make-usage-card.py 的分工：
-  · make-usage-card.py = 完整的一页使用说明（六节，面向拿到链接的人）
+  · make-usage-card.py = 一页使用说明（五节，只讲怎么用，**图上不放码**）
   · 本脚本             = 只讲「入口与边界」，专门用于群里转发 / 张贴
 
 用法:
-    python make-three-ends.py            # 生成两张 HTML 源
-    python make-three-ends.py --shot     # 打印截图用的 PowerShell 片段（两张各一段）
+    python make-three-ends.py            # 生成 HTML 源
+    python make-three-ends.py --shot     # 打印截图用的 PowerShell 片段
     python make-three-ends.py --trim     # 截完图后裁掉底部空白
+    python make-three-ends.py --check    # 回读成品图，验三个码的内容
 
 设计要点（沿用一页说明的视觉口径）:
   · 竖版 1080 宽，高度由内容决定（截图后量底边裁）
   · 二维码走 SVG data URI：纯色块图形，放大不糊，纠错级别 H
   · 平安橙 #EA5504 主色 + 浅色底；左上角不放序号（用户明确偏好）
-  · 三端用同一套色标贯穿两张图：橙=访谈端（一线） / 墨=管理端（有口令） / 浅橙=案例经验库（开放只读）
+  · 三端同一套色标：橙=访谈端（一线） / 墨=管理端（有口令） / 浅橙=案例经验库（开放只读）
+    —— 越开放越浅、越受限越深，颜色自己会说话
+  · 二维码块用 margin-top:auto 顶到列底，三列等高 → 三个码横平对齐
   · 全部文字为真实 HTML 文本，改文案只动下面的文案区
 """
 import io
@@ -33,10 +40,12 @@ except ImportError:         # 缺库时只留文字，不阻断整张图
 
 D = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(D, 'out')
+OUT_HTML = os.path.join(OUT_DIR, 'three-ends.html')
+OUT_PNG = os.path.join(OUT_DIR, 'three-ends.png')
 WIDTH = 1080
 
 # ── 三个入口地址（二维码指向这里）────────────────────────────
-# 与「访谈工具入口-二维码卡」「一页使用说明」同域同路径，避免同事手上链接不一致。
+# 与「一页使用说明」同域同路径，避免同事手上链接不一致。
 BASE = 'https://interview-work-d1gs0jzrg2277d75e.webapps.tcloudbase.com'
 QR_ADVISOR_URL = BASE + '/'
 QR_ADMIN_URL = BASE + '/admin.html'
@@ -48,13 +57,9 @@ QR_KB_URL = BASE + '/kb.html'
 
 HERO_KICKER = '平安融易陕分 · 销售团队经验萃取'
 HERO_TITLE = 'AI 访谈工具'
+HERO_SUB = '三个入口，三个功能'
 
-# 说明图（three-ends.png）
-NOTE_SUB = '三个入口，各看各的'
-# 入口图（three-ends-qr.png）
-QR_SUB = '三个入口，各扫各的'
-
-# 色标贯穿两张图：a=橙（访谈端） / b=墨（管理端） / c=浅橙（案例经验库，开放只读）
+# 色标贯穿全图：a=橙（访谈端） / b=墨（管理端） / c=浅橙（案例经验库，开放只读）
 ENDS = [
     {
         'tone': 'a',
@@ -64,13 +69,10 @@ ENDS = [
             ('口令', '无 · 凭链接进'),
             ('能看什么', '只看自己这一次的访谈'),
             ('能做什么', '填表 · 访谈 · 出报告'),
-            ('入口', '<code>index.html</code>'),
         ],
-        'qr_name': '访谈入口',
-        'qr_line': '填 4 项 · 跟 AI 聊 20 分钟<br>生成报告并提交',
-        'qr_who': '被访谈的人扫这个',
         'qr_url': QR_ADVISOR_URL,
         'qr_show': 'interview-work-d1gs0jzrg2277d75e<wbr>.webapps<wbr>.tcloudbase<wbr>.com',
+        'alt': '访谈入口二维码',
     },
     {
         'tone': 'b',
@@ -80,13 +82,10 @@ ENDS = [
             ('口令', '有 · 口令单独发'),
             ('能看什么', '报告正文 · 对话原文<br>姓名 · 工号'),
             ('能做什么', '审核 · 编辑 · 补发邮件'),
-            ('入口', '<code>admin.html</code>'),
         ],
-        'qr_name': '管理入口',
-        'qr_line': '看报告 · 审核状态<br>补发邮件 · 打标',
-        'qr_who': '需要口令，口令单独发',
         'qr_url': QR_ADMIN_URL,
         'qr_show': 'interview-work-d1gs0jzrg2277d75e<wbr>.webapps<wbr>.tcloudbase<wbr>.com<wbr>/admin.html',
+        'alt': '管理入口二维码',
     },
     {
         'tone': 'c',
@@ -96,44 +95,33 @@ ENDS = [
             ('口令', '无 · 凭链接看'),
             ('能看什么', '只有脱敏后的做法与要点'),
             ('能做什么', '只读浏览<br>按动作或场景检索'),
-            ('入口', '<code>kb.html</code>'),
         ],
-        'qr_name': '经验库入口',
-        'qr_line': '看所有人的做法要点<br>按动作或场景检索',
-        'qr_who': '免口令 · 内容已脱敏',
         'qr_url': QR_KB_URL,
         'qr_show': 'interview-work-d1gs0jzrg2277d75e<wbr>.webapps<wbr>.tcloudbase<wbr>.com<wbr>/kb.html',
+        'alt': '案例经验库二维码',
     },
 ]
 
-# 说明图：数据流向（一条线讲清三个端怎么接起来）
+# 数据流向（一条线讲清三个端怎么接起来）
 FLOW = [
     ('a', '访谈端 · 写入'),
     ('b', '管理端 · 审核归档'),
     ('c', '经验库 · 只读同步（自动）'),
 ]
+FLOW_CAP = '数据只往一个方向走：经验库拿到的永远是审核过的、脱敏后的'
 
-# 说明图：为什么这样分（口径与 kb.html 页脚一致，改一处要同步另一处）
+# 为什么这样分（口径与 kb.html 页脚一致，改一处要同步另一处）
 NOTE_HTML = (
     '<b>边界是按「谁能看到什么」划的</b>：访谈端凭链接即可填，所以不承载任何他人数据；'
     '管理端看得到姓名与对话原文，所以必须加口令；经验库面向全体同事、凭链接即看，所以'
     '<b>在服务端就把姓名、工号、所属机构与原始对话全部剔除</b> —— 页面本身拿不到这些字段，不是靠前端隐藏。'
     '<b>经验库不用维护</b>：新报告一归档就自动出现在那里，不需要谁去整理。'
 )
-
-QR_TIP_HTML = (
-    '<b>微信「扫一扫」也能打开链接，页面照常能用。</b>'
-    '只是微信里的语音输入有可能录不上音 —— 真遇到了，改用输入法的「语音转文字」，一样不用打字。'
-    '想录音最稳，用手机自带「相机」扫码后选「用浏览器打开」。'
-    '第一次打开会看到一次风险提醒页，点「确定访问」，以后不再出现。'
-    '<b>案例经验库是只读的</b>，上面没有任何可编辑的东西，可以放心转发给任何人。'
-)
+TIP_HTML = '第一次扫码打开会看到一次风险提醒页，点「确定访问」即可，之后不再出现。'
 
 FOOT_L = ('平安融易陕西分公司',
           '访谈链接由对应运营岗一对一发送 · 链接打不开，找发链接给你的那个人')
-# 说明图页脚右栏 / 入口图页脚右栏
-NOTE_FOOT_R = ('三个入口 · 说明版', '怎么分工，一图看懂')
-QR_FOOT_R = ('三个入口 · 一图转发', '扫哪个，看你是谁')
+FOOT_R = ('三个入口 · 一张图', '扫哪个 · 谁能看什么')
 
 # ─────────────────────────────────────────────────────────────
 # 以下为实现，改样式才需要动
@@ -216,7 +204,7 @@ body {
 /* ── 主体 ── */
 .main { padding: 40px 40px 34px; }
 
-/* 三列卡片：两张图共用同一套列宽与色标 */
+/* 三列卡片：职责在上、二维码顶到列底，三列等高 → 三个码横平对齐 */
 .grid { display: flex; gap: 20px; }
 .col {
   flex: 1;
@@ -242,7 +230,7 @@ body {
   color: var(--ink-2);
 }
 
-/* 说明图：标签行 */
+/* 职责要点：标签用浅底小胶囊，值左对齐 */
 .rows { margin-top: 16px; text-align: left; }
 .row { display: flex; align-items: flex-start; gap: 10px; margin-top: 11px; }
 .row:first-child { margin-top: 0; }
@@ -252,12 +240,17 @@ body {
   color: var(--ink-3); background: #F4F1EE; border-radius: 8px;
 }
 .row .v { flex: 1; font-size: 17px; line-height: 26px; color: var(--ink); }
-.row .v code {
-  font-family: "SF Mono", Consolas, "Courier New", monospace;
-  font-size: 15.5px; color: var(--ink-3);
+
+/* 二维码块：margin-top:auto 把它顶到列底 */
+.qr-block { margin-top: auto; padding-top: 18px; }
+.qr-img { display: flex; justify-content: center; }
+.qr-img img { width: 244px; height: 244px; display: block; }
+.qr-url {
+  margin-top: 10px; font-size: 13px; line-height: 1.5;
+  color: #A6ADB8;   /* 断行交给 URL 里的 <wbr>，落在「.」前 */
 }
 
-/* 说明图：数据流向 */
+/* 数据流向 */
 .flow {
   margin-top: 24px;
   background: var(--card);
@@ -274,23 +267,9 @@ body {
 .farr { font-size: 20px; color: var(--ink-3); font-weight: 700; }
 .flow-cap { margin-top: 12px; text-align: center; font-size: 16px; color: var(--ink-3); }
 
-/* 入口图：二维码 */
-.qr-img { display: flex; justify-content: center; margin-top: 20px; }
-.qr-img img { width: 264px; height: 264px; display: block; }
-.qr-name { margin-top: 18px; font-size: 30px; font-weight: 800; letter-spacing: .5px; }
-.qr-line { margin-top: 10px; font-size: 19px; line-height: 1.6; color: var(--ink-2); }
-.qr-who {
-  margin-top: 12px; font-size: 18px; line-height: 1.5;
-  color: var(--orange-dp); font-weight: 600;
-}
-.qr-url {
-  margin-top: 12px; font-size: 13px; line-height: 1.5;
-  color: #A6ADB8;   /* 断行交给 URL 里的 <wbr>，落在「.」前 */
-}
-
-/* 提示框 */
+/* 提示与边界说明 */
 .tip {
-  margin-top: 24px;
+  margin-top: 22px;
   background: var(--orange-lt);
   border: 1px solid #FBD8BE;
   border-radius: 18px;
@@ -312,32 +291,7 @@ body {
 '''.replace('@@W@@', str(WIDTH))
 
 
-def hero_html(sub):
-    return ('  <div class="hero">\n'
-            '    <div class="hero-kicker">%s</div>\n'
-            '    <div class="hero-title">%s</div>\n'
-            '    <div class="hero-sub">%s</div>\n'
-            '  </div>\n' % (HERO_KICKER, HERO_TITLE, sub))
-
-
-def foot_html(right):
-    return ('  <div class="foot">\n'
-            '    <div class="foot-l">\n'
-            '      <div class="foot-brand">%s</div>\n'
-            '      <div class="foot-sub">%s</div>\n'
-            '    </div>\n'
-            '    <div class="foot-r">%s<br>%s</div>\n'
-            '  </div>\n' % (FOOT_L[0], FOOT_L[1], right[0], right[1]))
-
-
-def page(title, body):
-    return ('<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n'
-            '<title>%s</title>\n<style>%s</style>\n</head>\n<body>\n'
-            '<div class="page">\n\n%s\n</div>\n</body>\n</html>\n' % (title, CSS, body))
-
-
-def build_note_html():
-    """三端说明图：谁用 / 口令 / 能看什么 / 能做什么 + 数据流向 + 为什么这样分。"""
+def build_html():
     cols = []
     for e in ENDS:
         rows = '\n'.join(
@@ -348,7 +302,13 @@ def build_note_html():
             '        <div class="col-head %s">%s</div>\n'
             '        <div class="col-who">%s</div>\n'
             '        <div class="rows">\n%s\n        </div>\n'
-            '      </div>' % (e['tone'], e['end'], e['who'], rows))
+            '        <div class="qr-block">\n'
+            '          <div class="qr-img"><img src="%s" alt="%s"></div>\n'
+            '          <div class="qr-url">%s</div>\n'
+            '        </div>\n'
+            '      </div>' % (e['tone'], e['end'], e['who'], rows,
+                                qr_data_uri(e['qr_url']), e['alt'], e['qr_show']))
+
     parts = []
     for i, (t, n) in enumerate(FLOW):
         if i:
@@ -356,48 +316,42 @@ def build_note_html():
         parts.append('      <span class="fnode %s">%s</span>' % (t, n))
     flow = '\n'.join(parts)
 
-    body = (hero_html(NOTE_SUB)
-            + '  <div class="main">\n'
-            + '    <div class="grid">\n' + '\n'.join(cols) + '\n    </div>\n\n'
-            + '    <div class="flow">\n' + flow + '\n    </div>\n'
-            + '    <div class="flow-cap">数据只往一个方向走：经验库拿到的永远是审核过的、脱敏后的</div>\n\n'
-            + '    <div class="tip">' + NOTE_HTML + '</div>\n'
-            + '  </div>\n\n'
-            + foot_html(NOTE_FOOT_R))
-    return page('AI 访谈工具 · 三个入口怎么分工', body)
+    body = (
+        '  <div class="hero">\n'
+        '    <div class="hero-kicker">%s</div>\n'
+        '    <div class="hero-title">%s</div>\n'
+        '    <div class="hero-sub">%s</div>\n'
+        '  </div>\n' % (HERO_KICKER, HERO_TITLE, HERO_SUB)
+        + '  <div class="main">\n'
+        + '    <div class="grid">\n' + '\n'.join(cols) + '\n    </div>\n\n'
+        + '    <div class="flow">\n' + flow + '\n    </div>\n'
+        + '    <div class="flow-cap">' + FLOW_CAP + '</div>\n\n'
+        + '    <div class="tip">' + NOTE_HTML + '</div>\n'
+        + '    <div class="tip">' + TIP_HTML + '</div>\n'
+        + '  </div>\n\n'
+        + '  <div class="foot">\n'
+        '    <div class="foot-l">\n'
+        '      <div class="foot-brand">%s</div>\n'
+        '      <div class="foot-sub">%s</div>\n'
+        '    </div>\n'
+        '    <div class="foot-r">%s<br>%s</div>\n'
+        '  </div>\n' % (FOOT_L[0], FOOT_L[1], FOOT_R[0], FOOT_R[1]))
 
-
-def build_qr_html():
-    """三端二维码入口图：三个码并排，扫哪个看你是什么角色。"""
-    cards = []
-    for e in ENDS:
-        cards.append(
-            '      <div class="col">\n'
-            '        <div class="col-head %s">%s</div>\n'
-            '        <div class="qr-img"><img src="%s" alt="%s二维码"></div>\n'
-            '        <div class="qr-name">%s</div>\n'
-            '        <div class="qr-line">%s</div>\n'
-            '        <div class="qr-who">%s</div>\n'
-            '        <div class="qr-url">%s</div>\n'
-            '      </div>' % (e['tone'], e['end'], qr_data_uri(e['qr_url']),
-                             e['qr_name'], e['qr_name'], e['qr_line'],
-                             e['qr_who'], e['qr_show']))
-
-    body = (hero_html(QR_SUB)
-            + '  <div class="main">\n'
-            + '    <div class="grid">\n' + '\n'.join(cards) + '\n    </div>\n\n'
-            + '    <div class="tip">' + QR_TIP_HTML + '</div>\n'
-            + '  </div>\n\n'
-            + foot_html(QR_FOOT_R))
-    return page('AI 访谈工具 · 三个入口', body)
+    return ('<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n'
+            '<title>AI 访谈工具 · 三个入口</title>\n<style>%s</style>\n</head>\n<body>\n'
+            '<div class="page">\n\n%s\n</div>\n</body>\n</html>\n' % (CSS, body))
 
 
 def trim(path):
     """按内容实际底边裁掉多余空白。
 
     无头 Edge 的 --screenshot 只能截「窗口大小」，窗口高度得给足（否则内容被切），
-    给足了又会在底部留一段 body 背景色。这里从下往上找第一整行的空白，
-    那一行就是页面底边。缺 Pillow/numpy 时跳过，不阻断流程。
+    给足了又会在底部留一段 body 背景色。
+
+    做法：**从下往上分块扫，找全图最后一个非背景行**，它下面全是空白。
+    两个坑都在这：①不能取「整幅里最靠上的空白行」——页面中间的留白会被当成底边；
+    ②不能「扫到第一个含空白的块就收工」——那一块整块都是空白时，块顶离内容还差一整块。
+    分块是为了省内存：整张 2160×11200 一次性转 int 会吃掉几百兆。
     """
     try:
         from PIL import Image
@@ -409,48 +363,34 @@ def trim(path):
         print('[skip] 截图不存在，跳过裁剪 ->', path)
         return
     im = Image.open(path).convert('RGB')
-    a = np.asarray(im).astype(int)
-    h, w, _ = a.shape
-    bg = np.array([233, 229, 225])       # body 背景 = 页面之外的空白
-    is_bg = (np.abs(a - bg).sum(axis=2) < 10).all(axis=1)
-    rows = np.where(is_bg)[0]
-    if not len(rows) or rows.min() == 0:
-        print('[trim] 没找到整行空白，保持原尺寸', (w, h))
+    w, h = im.size
+    bg = np.array([233, 229, 225], dtype=np.int16)      # body 背景 = 页面之外的空白
+    step = 240
+    bottom = None
+    y = h
+    while y > 0:
+        y0 = max(0, y - step)
+        band = np.asarray(im.crop((0, y0, w, y))).astype(np.int16)
+        miss = np.where(~(np.abs(band - bg).max(axis=2) < 10).all(axis=1))[0]
+        if len(miss):
+            bottom = y0 + int(miss.max()) + 1
+            break
+        y = y0
+    if not bottom:
+        print('[trim] 整幅都是背景色，保持原尺寸', (w, h))
         return
-    bottom = int(rows.min())
+    if bottom >= h:
+        print('[trim] 内容触到窗口底边（窗口给矮了），未裁剪', (w, h))
+        return
     im.crop((0, 0, w, bottom)).save(path)
     print('[ok] 裁剪为', (w, bottom), '->', path)
-
-
-def shot():
-    """打印两张图的截图片段 —— 在 PowerShell 工具里逐段执行（一次一张）。"""
-    for name, out_png in (('three-ends', 'three-ends.png'),
-                          ('three-ends-qr', 'three-ends-qr.png')):
-        src = os.path.join(OUT_DIR, name + '.html').replace('/', '\\')
-        out = os.path.join(OUT_DIR, out_png).replace('/', '\\')
-        print('[shot] %s —— 在 PowerShell 工具里执行：' % name)
-        print('$ErrorActionPreference = \'SilentlyContinue\'')
-        print('Get-Process msedge | Stop-Process -Force')
-        print('Start-Sleep -Milliseconds 1500')
-        print('$ud = Join-Path $env:TEMP (\'edge-\' + [guid]::NewGuid().ToString(\'N\'))')
-        print('Start-Process -FilePath msedge -ArgumentList @(')
-        print('  \'--headless\', \'--disable-gpu\', \'--no-first-run\', \'--hide-scrollbars\',')
-        print('  \'--force-device-scale-factor=2\',')
-        print('  \'--window-size=%d,2400\',' % WIDTH)
-        print('  "--user-data-dir=$ud",')
-        print('  "--screenshot=%s",' % out)
-        print('  "file:///%s"' % src)
-        print(') -Wait')
-        print('Test-Path "%s"' % out)
-        print()
 
 
 def check_qrs(png_path):
     """截图后回读二维码：用 OpenCV 解码成品 PNG，确认码里真是那三个地址。
 
     这是端到端验证 —— 不信任「生成时传对了参数」，直接验产物。
-    三张码必须**同时**被解出来且各不相同（少一张 = 图上有码没解出来，要人工看）。
-    缺 opencv 时跳过，不阻断流程。
+    三张码必须**同时**被解出来且与三个地址逐一相等（少一张 = 图上有码没解出来，要人工看）。
     """
     try:
         import cv2
@@ -474,24 +414,39 @@ def check_qrs(png_path):
     sys.exit(1)
 
 
+def shot():
+    """打印截图片段 —— 在 PowerShell 工具里执行（PowerShell 里直调 Edge 才稳定）。"""
+    out = OUT_PNG.replace('/', '\\')
+    src = OUT_HTML.replace('/', '\\')
+    print('[shot] 在 PowerShell 工具里执行：')
+    print('$ErrorActionPreference = \'SilentlyContinue\'')
+    print('Get-Process msedge | Stop-Process -Force')
+    print('Start-Sleep -Milliseconds 1500')
+    print('$ud = Join-Path $env:TEMP (\'edge-\' + [guid]::NewGuid().ToString(\'N\'))')
+    print('Start-Process -FilePath msedge -ArgumentList @(')
+    print('  \'--headless\', \'--disable-gpu\', \'--no-first-run\', \'--hide-scrollbars\',')
+    print('  \'--force-device-scale-factor=2\',')
+    print('  \'--window-size=%d,2400\',' % WIDTH)
+    print('  "--user-data-dir=$ud",')
+    print('  "--screenshot=%s",' % out)
+    print('  "file:///%s"' % src)
+    print(') -Wait')
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    targets = (('three-ends', build_note_html), ('three-ends-qr', build_qr_html))
-    for name, builder in targets:
-        path = os.path.join(OUT_DIR, name + '.html')
-        html = builder()
-        with io.open(path, 'w', encoding='utf-8', newline='\n') as f:
-            f.write(html)
-        print('[ok] HTML ->', path, '（字符数 %d）' % len(html))
+    html = build_html()
+    with io.open(OUT_HTML, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(html)
+    print('[ok] HTML ->', OUT_HTML, '（字符数 %d）' % len(html))
     if segno is None:
         print('[warn] 未安装 segno，二维码为空（pip install segno）')
     if '--shot' in sys.argv:
         shot()
     if '--trim' in sys.argv:
-        trim(os.path.join(OUT_DIR, 'three-ends.png'))
-        trim(os.path.join(OUT_DIR, 'three-ends-qr.png'))
+        trim(OUT_PNG)
     if '--check' in sys.argv:
-        check_qrs(os.path.join(OUT_DIR, 'three-ends-qr.png'))
+        check_qrs(OUT_PNG)
 
 
 if __name__ == '__main__':
