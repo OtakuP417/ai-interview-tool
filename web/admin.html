@@ -623,7 +623,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.10.10-b';
+const ADMIN_BUILD = 'v2026.10.12-a';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
@@ -1110,6 +1110,40 @@ function closeDrawer() {
   currentId = null;
 }
 
+/* L4：访谈过程事件（规则注入 / 回复闸门命中）。
+   用途是回答「哪条规则靠自己生效、哪条靠代码兜底」——
+   某类注入次数多 = 这条规则模型自己不做，得靠代码提醒；
+   长期为 0 = 模型已经自己做得到，注入可以撤掉。 */
+const GATE_LOG_LABELS = {
+  inject_opener: '开场未复述主题',
+  inject_switch: '连续短答未换形态',
+  inject_release: '换法用尽未止损',
+  inject_number: '数字未问来路',
+  inject_boundary: '未问失效边界',
+  gate_fixed: '回复不合格 · 已重写',
+  gate_unfixed: '回复不合格 · 重写未成功',
+};
+
+function renderGateLog(row) {
+  const log = Array.isArray(row.gate_log) ? row.gate_log : [];
+  if (!log.length) {
+    return '<div class="meta-item" style="grid-column:1/-1"><div class="meta-label">访谈过程事件</div>'
+      + '<div class="meta-value" style="color:var(--text-hint)">无 —— 模型全程自己按规则做（或该记录早于本功能上线）</div></div>';
+  }
+  const cnt = {};
+  log.forEach(e => { cnt[e.kind] = (cnt[e.kind] || 0) + 1; });
+  const inj = log.filter(e => String(e.kind).indexOf('inject_') === 0).length;
+  const gate = log.filter(e => String(e.kind).indexOf('gate_') === 0).length;
+  const chips = Object.keys(cnt).map(k => {
+    const rounds = log.filter(e => e.kind === k).map(e => e.round).join('、');
+    const cls = String(k).indexOf('gate_') === 0 ? ' free' : '';
+    return `<span class="tag-chip${cls}" title="第 ${rounds} 轮">${esc(GATE_LOG_LABELS[k] || k)} ×${cnt[k]}</span>`;
+  }).join('');
+  return '<div class="meta-item" style="grid-column:1/-1"><div class="meta-label">访谈过程事件'
+    + '<span class="meta-hint">规则注入 ' + inj + ' 次 · 回复闸门命中 ' + gate + ' 次（只记类别与轮次，不记访谈内容）</span>'
+    + '</div><div class="meta-value tag-row">' + chips + '</div></div>';
+}
+
 function renderDetail(row) {
   document.getElementById('d-title').textContent =
     row.interviewee_name + ' · ' + (row.city || '—');
@@ -1160,6 +1194,7 @@ function renderDetail(row) {
             }).join('')
           : '<span style="color:var(--text-hint)">未打标</span>'
       }</div></div>
+      ${renderGateLog(row)}
     </div>
 
     ${repRev > 0 ? `

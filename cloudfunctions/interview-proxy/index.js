@@ -413,6 +413,28 @@ function autoTagById(id, row, apiKey) {
     });
 }
 
+/* ── 访谈过程事件日志（L4 可观测性，2026-10-12）─────────────────
+   前端记录的「规则注入」与「回复闸门命中」。设计上刻意做白名单清洗：
+   kind 只接受已知的几类，字段只保留 kind/round ——
+   这一列是给统计用的，不该变成任意 JSON 的入库入口。 */
+const GATE_LOG_KINDS = [
+  "inject_opener", "inject_switch", "inject_release", "inject_number", "inject_boundary",
+  "gate_fixed", "gate_unfixed",
+];
+function cleanGateLog(v) {
+  if (!Array.isArray(v)) return null;
+  const out = [];
+  for (let i = 0; i < v.length && out.length < 400; i++) {
+    const e = v[i];
+    if (!e || GATE_LOG_KINDS.indexOf(e.kind) === -1) continue;
+    out.push({
+      kind: e.kind,
+      round: Math.max(0, Math.min(999, Math.trunc(Number(e.round) || 0))),
+    });
+  }
+  return out.length ? out : null;
+}
+
 function handleSubmit(req, res) {
   readRawBody(req)
     .then(function (raw) {
@@ -439,6 +461,8 @@ function handleSubmit(req, res) {
           : 0,
         report_md: maskSensitive(asText(body.report_md, 60000)),
         transcript: maskTranscript(body.transcript),
+        /* L4：规则注入与闸门命中事件（只含类别与轮次，白名单清洗后入库） */
+        gate_log: cleanGateLog(body.gate_log),
       };
 
       const missing = [];

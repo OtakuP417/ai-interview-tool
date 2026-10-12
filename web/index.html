@@ -841,7 +841,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.10.12-c';
+const APP_BUILD = 'v2026.10.12-d';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -1487,6 +1487,11 @@ let state = {
   reportRaw: '',  // 报告原文
   archived: false,
   posterBlocked: '',  // 非空表示一图流出图被服务端明确拒绝（如缺「海报摘要」）
+  /* L4 可观测性（2026-10-12）：本场访谈发生过的"规则没被执行"事件。
+     分两类 —— inject_*（靠代码注入才让模型照做）与 gate_*（回复不合格被闸门拦下）。
+     作用是回答一个此前只能靠人读对话回答的问题：这条规则到底靠谁生效？
+     只记类别与轮次，不含任何访谈内容，可随归档落库做横向统计。 */
+  events: [],
 };
 
 /* ─── 访谈过程的本地持久化 ─────────────────────────────────
@@ -1565,6 +1570,19 @@ const SHORT_SWITCH_WAYS = [
   '"这些细节是要写进给新人的材料里的，所以你当时那句话具体怎么说的，对我特别有用。"',
 ];
 
+/* ── 触发器③④的判据（2026-10-12 追加）──────────────────────
+   ③ 主题里带"必须问出来路"的量化表述，与 SYSTEM_PROMPT
+      【主题里带数字或结论时，必须问出它的来路】口径一致：
+      阿拉伯数字、中文份额（占一半/三成）、"转化率/占比"这类成果声明都算。
+   ④ "已经讲到具体做法"直接复用 assessCoverage 用的 METHOD_SIGNAL_RE，
+      不另造一套判据 —— 两处口径不一致会让"素材够了"和"该追问了"打架。 */
+const NUMERIC_TOPIC_RE = /\d|一半|几成|百分之|占比|转化率|成功率|成交率|[一二三四五六七八九十]\s*[成半倍]/;
+/* "这个数的来路问过了吗" —— 注入文案本身含"怎么统计""系统里"，
+   所以问过之后自然会停止重复注入。 */
+const NUMERIC_ASKED_RE = /怎么算|怎么统计|从哪|从哪里|系统里|怎么来的|怎么得出|哪来的|数据来源|怎么知道/;
+/* "什么时候不管用问过了吗" —— 同上，注入文案含"不灵""不管用"。 */
+const BOUNDARY_ASKED_RE = /不管用|不灵|不适用|没效果|哪类客户[\s\S]{0,8}不|什么样的客户[\s\S]{0,8}不|什么时候[\s\S]{0,8}不/;
+
 function stripPunct(s) {
   return String(s || '').replace(/[\s，,。.！!？?、；;：:·「」『』（）()]/g, '');
 }
@@ -1582,25 +1600,53 @@ function shortStreak(messages) {
   return n;
 }
 
+/* 取某一方说过的话（user 侧自动排除 internal 的系统代发指令）。 */
+function saidBy(messages, role) {
+  return (messages || [])
+    .filter(m => m.role === role && !(role === 'user' && m.internal))
+    .map(m => String(m.content || ''))
+    .join('\n');
+}
+
 /* 主题是否已被 AI 原样复述过。用 4 字滑窗：口语转述长短不一也能命中。
    判宽松一点 —— 宁可少注入一次，也不要每轮都念一遍主题。 */
 function topicMentioned(messages, topic) {
   const core = stripPunct(topic);
   if (core.length < 4) return false;
-  const said = (messages || [])
-    .filter(m => m.role === 'assistant')
-    .map(m => stripPunct(m.content))
-    .join('');
+  const said = stripPunct(saidBy(messages, 'assistant'));
   for (let i = 0; i + 4 <= core.length; i++) {
     if (said.indexOf(core.slice(i, i + 4)) >= 0) return true;
   }
   return false;
 }
 
-/* 返回本轮要注入的指令（可能多条拼在一起），没有则 null。 */
-function interventions(messages, topic) {
+/* 把一条注入文案解析成触发器类别（记录与去重都用它）。
+   ★ 用「文案特征」反推类别而不是让 interventions 返回结构体 ——
+   返回结构体会牵动既有调用方与护栏，代价大于收益。 */
+const INTERVENTION_MAX_HITS = 2;   // 同类触发器最多注入几次
+function interventionKinds(tip) {
+  const t = String(tip || '');
+  const out = [];
+  if (t.indexOf('原样复述主题') >= 0) out.push('opener');
+  if (t.indexOf('换访谈形态') >= 0) out.push('switch');
+  if (t.indexOf('这一块先放下') >= 0) out.push('release');
+  if (t.indexOf('问出这个数的来路') >= 0) out.push('number');
+  if (t.indexOf('追一句失效边界') >= 0) out.push('boundary');
+  return out;
+}
+function countKind(events, kind) {
+  return (events || []).filter(e => e && e.kind === kind).length;
+}
+
+/* 返回本轮要注入的指令（可能多条拼在一起），没有则 null。
+   events：本场访谈已发生的注入/闸门事件（见 state.events），用来抑制重复提醒。
+   ★ 为什么需要它：③④ 是"该做但没做"的持续提醒。纯函数看不到"已经提醒过几次
+   而模型没照做"，就会每 3-4 轮一直提醒到访谈结束（回放 #21 实测 16 次）。
+   提醒到第 2 次还不照做，问题就不在提醒本身了，继续加只会变成噪音。 */
+function interventions(messages, topic, events) {
   const msgs = messages || [];
   const turns = msgs.filter(m => m.role === 'user' && !m.internal);
+  const ev = events || [];
   const out = [];
 
   // ① 开场先确认主题：还没开始（首轮），或聊了 1 轮仍未复述过主题
@@ -1621,6 +1667,33 @@ function interventions(messages, topic) {
       out.push('【这一块先放下】' + head + '三种换法都试过了 —— 说明这块他确实没细想过。' +
         '本轮不要再追问这个话题，如实记下"这一点他没展开"，换一个他可能有话说的方向往下走' +
         '（例如具体某一单从头到尾的经过）。不要反复纠缠同一件事。');
+    }
+  } else {
+    /* ★ ③④ 只在"没有连续短答"时注入 —— 对方正在用省力模式应付的时候，
+       再往本轮堆"要问数字来路、要问失效边界"只会让它更敷衍。先解决配合度。 */
+    const aiSaid = saidBy(msgs, 'assistant');
+    const userSaid = saidBy(msgs, 'user');
+
+    /* ③ 主题里的数字/比例还没问到来源。每隔 3 轮提醒一次（不是每轮），
+       同类最多 SHORT_MAX 次 —— 问到就自然停，一直问不出来也不无限催。 */
+    if (turns.length >= 3 && turns.length % 3 === 0 &&
+        countKind(ev, 'number') < INTERVENTION_MAX_HITS &&
+        NUMERIC_TOPIC_RE.test(String(topic || '')) && !NUMERIC_ASKED_RE.test(aiSaid)) {
+      const m = String(topic || '').match(/\d+(?:\.\d+)?\s*[%％万亿件个单倍]?/)
+             || String(topic || '').match(/(一半|几成|百分之[一二三四五六七八九十百]+|[一二三四五六七八九十]\s*[成半倍])/);
+      out.push('【问出这个数的来路】主题里的「' + (m ? m[0].trim() : '这个数') +
+        '」到现在还没问到来源。本轮只问这一件事：它是怎么统计出来的 —— ' +
+        '是您自己算的，还是系统里能查到的？');
+    }
+
+    /* ④ 做法已经讲到方法层，但还没问过"什么时候不管用"。
+       判据复用 assessCoverage 的 METHOD_SIGNAL_RE，保证与"素材够不够"同口径。 */
+    if (turns.length >= 4 && turns.length % 4 === 0 &&
+        countKind(ev, 'boundary') < INTERVENTION_MAX_HITS &&
+        METHOD_SIGNAL_RE.test(userSaid) && !BOUNDARY_ASKED_RE.test(aiSaid)) {
+      out.push('【追一句失效边界】对方已经讲到具体做法了，但还没问过"什么时候不管用"。' +
+        '本轮追一句，一定要用口语问（别说"失效边界""适用条件"这类词，他听不懂）：' +
+        '"有没有试过不灵的？什么样的客户身上就不管用了？"');
     }
   }
 
@@ -1644,6 +1717,18 @@ function withIntervention(messages, tip) {
   return out;
 }
 
+/* ─── L4 事件记录（2026-10-12）─────────────────────────────
+   记"规则没被执行"这件事本身，而不是记对话内容。
+   kind 命名：inject_* = 靠代码注入才让模型照做；gate_* = 回复不合格被闸门处理。
+   目的：归档后能直接算出「哪条规则靠自己生效、哪条靠兜底」，
+   不必再人工读 40 多轮对话去判断。 */
+function pushEvent(kind, round) {
+  if (!Array.isArray(state.events)) state.events = [];
+  state.events.push({ kind: kind, round: round || 0, at: Date.now() });
+  /* 防御：异常长的访谈也别让事件数组无限增长（正常一场不会超过几十条） */
+  if (state.events.length > 400) state.events = state.events.slice(-400);
+}
+
 function saveDraft() {
   // 访谈尚未开始、或尚无有效问答时不落盘
   if (!state.interviewee.name) return;
@@ -1657,6 +1742,7 @@ function saveDraft() {
       roundCount: state.roundCount,
       reportRaw: state.reportRaw,
       archived: state.archived,
+      events: state.events,
     }));
   } catch (e) { /* 隐私模式或配额满：静默放弃，不影响访谈本身 */ }
 }
@@ -2468,6 +2554,8 @@ function resumeDraft() {
   state.roundCount = d.roundCount || 0;
   state.reportRaw = d.reportRaw || '';
   state.archived = !!d.archived;
+  // L4：续接时把已发生的事件一起接回来，否则"提醒过几次"的判断会从零重来
+  state.events = Array.isArray(d.events) ? d.events : [];
 
   const iv = state.interviewee;
   document.getElementById('header-name').textContent = iv.name + ' · ' + iv.position;
@@ -2579,6 +2667,7 @@ async function startInterview() {
   state.roundCount = 0;
   state.reportRaw = '';
   state.archived = false;
+  state.events = [];   // L4：新访谈从零开始记
 
   document.getElementById('header-name').textContent = name + ' · ' + position;
   document.getElementById('header-meta').textContent = buildHeaderMeta({ city, um, topic });
@@ -2716,9 +2805,15 @@ async function streamAI(injectedUserMsg = null) {
   showTyping();
 
   /* ★ L1 条件注入：判定用副本 msgs，注入只进本次请求的 reqMsgs，
-     不回头改 state.messages（否则这些话会出现在回放与归档里）。 */
-  const tip = interventions(msgs, state.interviewee.topic);
+     不回头改 state.messages（否则这些话会出现在回放与归档里）。
+     events 传进去是为了抑制重复提醒：同类触发器到上限就不再注入。 */
+  const tip = interventions(msgs, state.interviewee.topic, state.events);
   const reqMsgs = withIntervention(msgs, tip);
+  if (tip) {
+    const kinds = interventionKinds(tip);
+    const r = countRounds(state.messages);
+    for (let i = 0; i < kinds.length; i++) pushEvent('inject_' + kinds[i], r);
+  }
 
   try {
     const res = await fetch(API_ENDPOINT, {
@@ -2774,12 +2869,16 @@ async function streamAI(injectedUserMsg = null) {
        （"那这笔几十万在你们营业部，"），被访谈人只能回"问题没问完"；空回复也出现过两次。
        这里做一次代码级校验，不合格就让模型重写这一轮（只重写一次，失败就保留原文，
        绝不阻断访谈）。 */
+    const badBefore = replyLooksBad(full);
     const fixed = await repairReply(msgs, full);
     if (fixed) {
       push.reset(fixed);
       state.messages[state.messages.length - 1] = { role: 'assistant', content: fixed };
       full = fixed;
     }
+    /* L4：闸门命中也记一条 ——「模型自己写合格了」和「被拦下重写才合格」
+       是两件不同的事，归档后要能分开看。 */
+    if (badBefore) pushEvent(fixed ? 'gate_fixed' : 'gate_unfixed', countRounds(state.messages));
 
   } catch (e) {
     hideTyping();
@@ -3324,6 +3423,7 @@ async function submitArchive() {
     backend_owner_org: iv.ownerOrg || null,
     round_count: countRounds(state.messages),   // 与 transcript 口径一致，避免计数器漂移
     report_md: state.reportRaw,
+    gate_log: state.events,   // L4：本场访谈的注入/闸门事件（只含类别与轮次，不含内容）
     transcript,
     poster_png_base64: posterPng,   // 简略一图流；可能为 null：服务端自动降级
     full_png_base64: fullPng,       // 完整报告长图；可能为 null：服务端自动降级

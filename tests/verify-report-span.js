@@ -114,7 +114,7 @@ console.log('\n[3] 生成端的素材取舍要求');
 
 console.log('\n[4] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-c'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-c',
+  ok(/APP_BUILD = 'v2026\.10\.12-d'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-d',
     (web.match(/APP_BUILD = '[^']*'/) || [''])[0]);
 }
 

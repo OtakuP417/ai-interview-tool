@@ -1,5 +1,5 @@
 /**
- * L1 条件注入 + L2 冲突消解 护栏（2026-10-12，v2026.10.12-c）
+ * L1 条件注入 + L2 冲突消解 护栏（2026-10-12，v2026.10.12-d）
  *
  * 事故背景：扫 6 份归档 / 169 轮 AI 回复后发现 —— 凡「要求模型停下或退回」的规则
  * 执行率都是 0：
@@ -27,10 +27,14 @@ function ok(cond, label, extra) {
 }
 
 const web = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
+const adm = fs.readFileSync(path.join(__dirname, '..', 'web', 'admin.html'), 'utf8');
 
-/* 从页面里抽出 L1 那段函数（到 saveDraft 为止），真跑而不是只做字面断言。 */
+/* 从页面里抽出 L1 那段函数（到 saveDraft 为止），真跑而不是只做字面断言。
+   ★ 必须把 METHOD_SIGNAL_RE 的定义一起带上 —— 触发器④ 直接复用它的口径。
+   漏掉这段会抛 ReferenceError，而如果测试恰好没走到 ④ 就会"假绿"。 */
+const srcMethod = web.slice(web.indexOf('const METHOD_SIGNAL_RE'), web.indexOf('function sectionMap'));
 const src = web.slice(web.indexOf('const SHORT_ANSWER_MAX'), web.indexOf('function saveDraft'));
-const L1 = new Function(src + '\nreturn { interventions, withIntervention, shortStreak, isShortAnswer, topicMentioned, SHORT_ANSWER_MAX, SHORT_STREAK, SHORT_SWITCH_WAYS };')();
+const L1 = new Function(srcMethod + '\n' + src + '\nreturn { interventions, withIntervention, interventionKinds, countKind, shortStreak, isShortAnswer, topicMentioned, saidBy, SHORT_ANSWER_MAX, SHORT_STREAK, SHORT_SWITCH_WAYS, INTERVENTION_MAX_HITS, NUMERIC_TOPIC_RE, BOUNDARY_ASKED_RE };')();
 
 const TOPIC = '转化率高达14%，个体户放款4件，怎么经营个体户？';
 const U = (t) => ({ role: 'user', content: t });
@@ -131,6 +135,95 @@ console.log('\n[1b] 换法必须递进，不能每轮重复刷同一条');
   ok(L1.SHORT_SWITCH_WAYS[2].indexOf('给新人') >= 0, '换法③说明细节用途');
 }
 
+console.log('\n[1c] 触发器③：数字未问来路');
+{
+  /* 造一段"聊了 n 轮、每轮都有内容"的对话，可选地让 AI 问过 / 没问过数字来路 */
+  const talk = (n, aiExtra) => {
+    const a = [SYS()];
+    for (let i = 0; i < n; i++) {
+      a.push(U('我一般是先打电话过去问他有没有资金需求，有兴趣就约时间见面聊具体方案'));
+      a.push(A('那你一般多久联系一次呢，是每周还是每月？' + (aiExtra || '')));
+    }
+    return a;
+  };
+
+  const TOPIC_NUM = '转化率高达14%，个体户放款4件，怎么经营个体户？';
+  const TOPIC_PLAIN = '新人快速签约开单';
+
+  /* turns=3 且主题带数字、AI 没问过 → 命中 */
+  const hit = L1.interventions(talk(3), TOPIC_NUM);
+  ok(!!hit && hit.indexOf('问出这个数的来路') >= 0, 'turns=3 + 主题带数字 + 未问过 → 注入');
+  ok(!!hit && hit.indexOf('14%') >= 0, '注入文案里点出了主题中的那个数（14%）');
+  ok(!!hit && hit.indexOf('怎么统计') >= 0, '注入问的是"怎么统计出来的"');
+
+  /* 反例①：主题里没有数字/比例 → 不该注入 */
+  const plain = L1.interventions(talk(3), TOPIC_PLAIN);
+  ok(!plain || plain.indexOf('问出这个数的来路') < 0, '主题无量化表述 → 不注入');
+
+  /* 反例②：AI 已经问过 → 必须停，不能反复提醒 */
+  const asked = L1.interventions(talk(3, '这个数是怎么统计出来的？是系统里能查到的吗？'), TOPIC_NUM);
+  ok(!asked || asked.indexOf('问出这个数的来路') < 0, 'AI 问过之后 → 停止注入');
+
+  /* 反例③：间隔 3 轮，不是每轮都催 */
+  ok(!L1.interventions(talk(4), TOPIC_NUM) || L1.interventions(talk(4), TOPIC_NUM).indexOf('问出这个数的来路') < 0,
+    'turns=4（非 3 的倍数）→ 不催，避免变成噪音');
+  ok(L1.interventions(talk(6), TOPIC_NUM).indexOf('问出这个数的来路') >= 0, 'turns=6 → 再提醒一次');
+
+  /* 反例④：连续短答时不叠加 —— 先解决配合度，别再堆任务 */
+  const shortAndNum = [SYS(), A('开场')];
+  for (let i = 0; i < 3; i++) {
+    shortAndNum.push(U('嗯'));
+    shortAndNum.push(A('那你具体是怎么做的呢？'));
+  }
+  const both = L1.interventions(shortAndNum, TOPIC_NUM);
+  ok(both.indexOf('换访谈形态') >= 0, '连续短答时走换形态分支（3 轮 → 第 1 种）');
+  ok(both.indexOf('问出这个数的来路') < 0, '连续短答时不叠加数字来路（避免堆任务）');
+
+  /* 判据本身：中文份额也算量化表述 */
+  ok(L1.NUMERIC_TOPIC_RE.test('法人进件占一半，如何锁定法人客户？'), '「占一半」算量化表述');
+  ok(L1.NUMERIC_TOPIC_RE.test('转化率高'), '「转化率高」这类成果声明也算');
+  ok(!L1.NUMERIC_TOPIC_RE.test('新人快速签约开单'), '纯描述性主题不算');
+}
+
+console.log('\n[1d] 触发器④：做法未问失效边界');
+{
+  const withMethod = (n, aiExtra) => {
+    const a = [SYS()];
+    for (let i = 0; i < n; i++) {
+      /* 含 METHOD_SIGNAL_RE 的信号（微信/电话、频次、"第一句"），说明做法已到方法层 */
+      a.push(U('我一般是每周用微信发一次消息，第一句就先问他最近生意怎么样'));
+      a.push(A('那你觉得这样做的效果如何？' + (aiExtra || '')));
+    }
+    return a;
+  };
+  const noMethod = (n) => {
+    const a = [SYS()];
+    for (let i = 0; i < n; i++) {
+      a.push(U('就是认真地做，把该做的事情做好，客户自然就来了'));
+      a.push(A('那你觉得这件事难在哪？'));
+    }
+    return a;
+  };
+
+  const hit4 = L1.interventions(withMethod(4), '新人快速签约开单');
+  ok(!!hit4 && hit4.indexOf('追一句失效边界') >= 0, 'turns=4 + 做法已到方法层 + 未问过 → 注入');
+  ok(!!hit4 && hit4.indexOf('有没有试过不灵的') >= 0, '注入的是口语问法（不说"失效边界"）');
+  ok(!!hit4 && hit4.indexOf('别说"失效边界"') >= 0, '明确要求模型不要用术语');
+
+  const asked4 = L1.interventions(withMethod(4, '那有没有试过不灵的？什么样的客户身上就不管用了？'), '新人快速签约开单');
+  ok(!asked4 || asked4.indexOf('追一句失效边界') < 0, 'AI 问过之后 → 停止注入');
+
+  const noM = L1.interventions(noMethod(4), '新人快速签约开单');
+  ok(!noM || noM.indexOf('追一句失效边界') < 0, '对方还没讲到方法层 → 不注入（避免硬问）');
+
+  ok(!L1.interventions(withMethod(5), '新人快速签约开单') ||
+     L1.interventions(withMethod(5), '新人快速签约开单').indexOf('追一句失效边界') < 0,
+    'turns=5（非 4 的倍数）→ 不催');
+
+  /* 判据复用：与 assessCoverage 用的 METHOD_SIGNAL_RE 是同一个常量 */
+  ok(/METHOD_SIGNAL_RE\.test\(userSaid\)/.test(web), '触发器④ 复用 METHOD_SIGNAL_RE（与素材覆盖判断同口径）');
+}
+
 console.log('\n[2] 注入不污染 state.messages');
 {
   const orig = [SYS(), U('对方原话')];
@@ -154,8 +247,8 @@ console.log('\n[2] 注入不污染 state.messages');
 
 console.log('\n[3] 接入点：发送用的是注入后的消息');
 {
-  ok(/const tip = interventions\(msgs, state\.interviewee\.topic\)/.test(web),
-    'streamAI 调用 interventions，主题取自 state.interviewee.topic');
+  ok(/const tip = interventions\(msgs, state\.interviewee\.topic, state\.events\)/.test(web),
+    'streamAI 调用 interventions，主题取自 state.interviewee.topic，并带上 events');
   ok(/const reqMsgs = withIntervention\(msgs, tip\)/.test(web), '构造 reqMsgs');
   ok(/messages: buildContext\(reqMsgs\)/.test(web), '发送用的是 reqMsgs（不是 msgs）');
   ok(!/tip[\s\S]{0,100}?state\.messages\.push/.test(web), '注入内容不写进 state.messages');
@@ -181,9 +274,62 @@ console.log('\n[4] L2 冲突消解');
   ok(/只在真有取舍的地方\*\*问/.test(web), '框架第 5 条与取舍专章对齐（删掉「必须问出」）');
 }
 
+console.log('\n[6] L4 可观测性：注入与闸门事件');
+{
+  /* 这一层要回答的问题是：哪条规则靠自己生效、哪条靠兜底 ——
+     以前只能人工读 40 多轮对话判断（本轮诊断就是这么做的），不可持续。 */
+  ok(/const tip = interventions\(msgs, state\.interviewee\.topic, state\.events\)/.test(web),
+    'streamAI 把 state.events 传进 interventions（用于抑制重复提醒）');
+  ok(/function pushEvent\(kind, round\)/.test(web), '存在 pushEvent');
+  ok(/pushEvent\('inject_' \+ kinds\[i\], r\)/.test(web), '注入记录成 inject_* 事件');
+  ok(/pushEvent\(fixed \? 'gate_fixed' : 'gate_unfixed'/.test(web), '闸门命中记录成 gate_* 事件');
+  ok(/if \(badBefore\) pushEvent/.test(web), '只有真的命中闸门才记录（不冤枉正常回复）');
+
+  ok(/events: state\.events,/.test(web), 'saveDraft 保存 events');
+  ok(/state\.events = Array\.isArray\(d\.events\) \? d\.events : \[\]/.test(web), 'resumeDraft 恢复 events（否则"提醒过几次"会从零重来）');
+  ok(/state\.events = \[\];\s*\/\/ L4/.test(web), 'startInterview 清空 events');
+  ok(/gate_log: state\.events,/.test(web), '归档 payload 带上 gate_log');
+
+  /* 真跑：同类触发器到上限后不再注入 */
+  ok(L1.INTERVENTION_MAX_HITS === 2, '同类触发器上限为 2 次');
+  const many = (n) => {
+    const a = [SYS()];
+    for (let i = 0; i < n; i++) {
+      a.push(U('我一般是每周用微信发一次消息，第一句就先问他最近生意怎么样'));
+      a.push(A('那你觉得这样做的效果如何？'));
+    }
+    return a;
+  };
+  const used = [{ kind: 'boundary' }, { kind: 'boundary' }];
+  const r1 = L1.interventions(many(4), '新人快速签约开单', used);
+  ok(!r1 || r1.indexOf('追一句失效边界') < 0, '同类事件已到上限 → 不再注入（提醒不能变成噪音）');
+  const r2 = L1.interventions(many(4), '新人快速签约开单', []);
+  ok(!!r2 && r2.indexOf('追一句失效边界') >= 0, '没有历史事件时照常注入（上限只针对重复）');
+
+  /* interventionKinds 把注入文案解析成类别 —— 记录与去重都靠它 */
+  ok(L1.interventionKinds('【换访谈形态 · 第 1 种】…').indexOf('switch') >= 0, '能解析出 switch');
+  ok(L1.interventionKinds('【问出这个数的来路】…').indexOf('number') >= 0, '能解析出 number');
+  ok(L1.interventionKinds('【追一句失效边界】…').indexOf('boundary') >= 0, '能解析出 boundary');
+  ok(L1.interventionKinds('【本轮第一件事】原样复述主题「X」…').indexOf('opener') >= 0, '能解析出 opener');
+  ok(L1.interventionKinds('【这一块先放下】…').indexOf('release') >= 0, '能解析出 release（止损）');
+  ok(L1.interventionKinds('').length === 0, '空文案解析为空数组');
+
+  /* 服务端与管理端：入库白名单清洗 + 详情页可见 */
+  const srv = fs.readFileSync(path.join(__dirname, '..', 'cloudfunctions', 'interview-proxy', 'index.js'), 'utf8');
+  ok(/function cleanGateLog\(v\)/.test(srv), '云函数对 gate_log 做白名单清洗（不是任意 JSON 入口）');
+  ok(/GATE_LOG_KINDS\.indexOf\(e\.kind\) === -1\) continue/.test(srv), '未知 kind 一律丢弃');
+  ok(/gate_log: cleanGateLog\(body\.gate_log\)/.test(srv), '/api/submit 写入清洗后的 gate_log');
+  ok(/out\.length > 400/.test(srv) || /out\.length < 400/.test(srv), '事件条数有上限（单列不会无限增长）');
+
+  ok(/function renderGateLog\(row\)/.test(adm), '管理端有 renderGateLog');
+  ok(/\$\{renderGateLog\(row\)\}/.test(adm), '详情页插入了事件区块');
+  ok(/GATE_LOG_LABELS/.test(adm), '事件类别有中文标签（不把 inject_* 直接甩给运营）');
+  ok(/只记类别与轮次，不记访谈内容/.test(adm), '界面写明只记类别与轮次');
+}
+
 console.log('\n[5] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-c'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-c');
+  ok(/APP_BUILD = 'v2026\.10\.12-d'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-d');
 }
 
 console.log('\n' + (fail ? '✗' : '✓') + ' 通过 ' + pass + ' 项，失败 ' + fail + ' 项\n');
