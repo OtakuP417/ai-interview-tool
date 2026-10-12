@@ -37,6 +37,7 @@ const poster = require("./poster");
 const tagger = require("./tagger");
 const asr = require("./asr");
 const aiEditor = require("./ai-editor");
+const kb = require("./kb");
 
 /**
  * CORS 由 CloudBase 网关统一注入。
@@ -1542,6 +1543,58 @@ function handleAsr(req, res) {
     });
 }
 
+/* ── 知识库聚合（GET，只读，无鉴权）─────────────────────────
+   把已归档报告解析成「主题 → 做法卡片」两层，给 kb.html 用。
+
+   ★ 实时聚合、不落库：新报告一归档就自动出现在知识库里，没有同步逻辑要维护。
+
+   ★ 脱敏是这一层的核心职责（知识库面向一线全员、无口令）：
+     · SELECT 只取白名单列 —— 绝不碰 transcript（用户原始输入，含小区名/单位名）
+       与 um / city / submitter_name；
+     · interviewee_name / backend_owner_name 取出来**只用于替换**（报告正文里写
+       原话会带归属标注「（某顾问）」），进 kb.buildKb 当 maskWords，不进任何字段。
+   改动这里时请连带跑 tests/verify-kb.js 的脱敏反向断言。 */
+let kbCache = { at: 0, data: null };
+const KB_CACHE_MS = 60 * 1000;
+
+function handleKb(req, res) {
+  if (req.method !== "GET") {
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return;
+  }
+  const now = Date.now();
+  if (kbCache.data && now - kbCache.at < KB_CACHE_MS) {
+    sendJson(res, 200, kbCache.data);
+    return;
+  }
+  pgRequest(
+    "GET",
+    "select=id,created_at,topic,round_count,report_md,interviewee_name,backend_owner_name" +
+      "&order=id.asc&limit=500",
+    null
+  )
+    .then(function (r) {
+      if (!r.ok) {
+        sendJson(res, 502, { error: "db_read_failed", status: r.status });
+        return;
+      }
+      const rows = Array.isArray(r.data) ? r.data : [];
+      const maskWords = [];
+      rows.forEach(function (x) {
+        const n = asText(x.interviewee_name, 40);
+        const o = asText(x.backend_owner_name, 40);
+        if (n && maskWords.indexOf(n) === -1) maskWords.push(n);
+        if (o && maskWords.indexOf(o) === -1) maskWords.push(o);
+      });
+      const payload = kb.buildKb(rows, { maskWords: maskWords });
+      kbCache = { at: now, data: payload };
+      sendJson(res, 200, payload);
+    })
+    .catch(function (e) {
+      sendJson(res, 502, { error: "kb_failed", detail: String((e && e.message) || e).slice(0, 200) });
+    });
+}
+
 /* ─────────────────────────── 路由 ─────────────────────────── */
 
 const server = http.createServer(function (req, res) {
@@ -1557,6 +1610,12 @@ const server = http.createServer(function (req, res) {
 
   if (req.method === "GET" && (path === "/health" || path === "/")) {
     sendJson(res, 200, { ok: true, service: "interview-proxy" });
+    return;
+  }
+
+  /* 知识库：GET /api/kb（无鉴权，只读，服务端已硬脱敏） */
+  if (path === "/api/kb" || path === "/kb") {
+    handleKb(req, res);
     return;
   }
 
@@ -1595,7 +1654,8 @@ const server = http.createServer(function (req, res) {
     path === "/api/admin" ||
     path === "/api/mail" ||
     path === "/api/poster" ||
-    path === "/api/asr"
+    path === "/api/asr" ||
+    path === "/api/kb"
   ) {
     sendJson(res, 405, { error: "method_not_allowed" });
     return;

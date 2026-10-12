@@ -61,7 +61,10 @@ ok("参数类错误回 400、服务类回 502",
   /const clientErr = \[/.test(IDX) && /clientErr \? 400 : 502/.test(IDX));
 ok("body 过大回 413", /413/.test(IDX) && /body_too_large/.test(IDX));
 ok("路由分发已挂 /api/asr", /path === "\/api\/asr"/.test(IDX) && /handleAsr\(req, res\)/.test(IDX));
-ok("405 白名单含 /api/asr", /path === "\/api\/asr"\s*\n?\s*\)\s*\{[\s\S]{0,120}method_not_allowed/.test(IDX));
+/* ★ 不要假设 /api/asr 是白名单的最后一条 —— 2026-10-12 加 /api/kb 时，
+   旧写法（要求 asr 后面紧跟 `)` 收尾）就红了。改成先框出整块再查成员。 */
+const _wl405 = (IDX.match(/if \(\s*\n\s*path === "\/"[\s\S]*?sendJson\(res, 405/) || [""])[0];
+ok("405 白名单含 /api/asr", /path === "\/api\/asr"/.test(_wl405));
 
 console.log("\n[6] 前端：录音链路完整");
 ok("麦克风按钮存在", /id="mic-btn"/.test(WEB) && /onclick="micToggle\(\)"/.test(WEB));

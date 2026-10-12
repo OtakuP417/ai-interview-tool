@@ -89,6 +89,8 @@ button, input, select, textarea { font-family: inherit; }
   cursor: pointer; transition: all .15s; white-space: nowrap;
 }
 .ghost-btn:hover { color: var(--text); border-color: var(--border-strong); }
+/* 知识库入口：本页（管理端）能看到姓名与对话原文，知识库页只看脱敏要点，两者是并列而非包含关系 */
+a.ghost-btn { text-decoration: none; display: inline-flex; align-items: center; }
 .primary-btn {
   background: var(--accent); color: #fff; border: none;
   border-radius: var(--radius-sm); padding: 7px 14px; font-size: 12.5px;
@@ -497,6 +499,8 @@ td.topic .ell {
       <div class="sub">平安融易陕分 · 销售团队经验萃取</div>
     </div>
     <div class="spacer"></div>
+    <a class="ghost-btn" href="kb.html" target="_blank" rel="noopener"
+      title="面向全体同事的案例经验库（已脱敏，无口令）">案例经验库 ↗</a>
     <button class="ghost-btn" onclick="exportCsv()">导出当前列表</button>
     <button class="ghost-btn" onclick="doLogout()">退出</button>
   </div>
@@ -623,7 +627,7 @@ function stripSectionHeading(text) {
 
 /* 管理端页面版本号。与访谈页的 APP_BUILD 独立编号，
    手机上缓存难清，靠这一行确认打开的是哪一版。 */
-const ADMIN_BUILD = 'v2026.10.12-b';
+const ADMIN_BUILD = 'v2026.10.12-c';
 
 /* ─── 覆盖度体检（与访谈页 assessCoverage 同一套判据）────────
    访谈页那套是给填表人自己看的；这里重写一份给审核方看（后台原先完全没有）。
