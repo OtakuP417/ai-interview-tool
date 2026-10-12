@@ -176,9 +176,13 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
   const lowerUm = (lj.rows || []).filter(x => x.interviewee_um && x.interviewee_um !== String(x.interviewee_um).toUpperCase());
   ok('★ 全表 UM 已统一大写', lowerUm.length === 0,
      lowerUm.map(x => x.id + ':' + x.interviewee_um).join(', '));
-  /* 发送状态：手工发在邮箱里的报告也已通过「标记为已发送」补记，列表不再有真假难辨的空值 */
-  const unsent = (lj.rows || []).filter(x => !x.mail_sent_at);
-  ok('★ 全部记录已标记发送状态', unsent.length === 0,
+  /* 发送状态：手工发在邮箱里的报告也已通过「标记为已发送」补记，列表不再有真假难辨的空值。
+     ★ 2026-10-12：批量导入的历史素材（app_build='import:…'，admin list 不返回该列）
+     **不发信**，mail_sent_at 天然为 NULL —— 用 round_count=0 把它们区分开，
+     否则每次导入都会把这条断言顶红（导入件永远补不上发送状态，也不该补）。 */
+  const isImported = x => Number(x.round_count || 0) === 0;
+  const unsent = (lj.rows || []).filter(x => !isImported(x) && !x.mail_sent_at);
+  ok('★ 访谈产生的记录都已标记发送状态（导入件不算）', unsent.length === 0,
      '未标记 id: ' + unsent.map(x => x.id).join(', '));
 
   console.log('\n[4b] 自动打标已落库');

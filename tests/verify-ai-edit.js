@@ -31,9 +31,13 @@ function ok(name, cond, extra) {
   else { fail++; console.log('  ✗ ' + name + (extra !== undefined ? '  → ' + extra : '')); }
 }
 
-/* 把 ai_edit 分支整段切出来，断言只看这一段，避免误命中 update 分支 */
+/* 把 ai_edit 分支整段切出来，断言只看这一段，避免误命中 update 分支。
+   ★ 右边界不能写死成 unknown_action：后面还会插新分支（import_extract / import_insert…），
+   写死会把这些分支一并圈进来 —— 新增的 import_insert 里有 pgRequest("POST")，
+   于是「ai_edit 分支里不许写库」这条会假红。改成自动找**下一个 action 分支**。 */
 const aiStart = FN.indexOf('action === "ai_edit"');
-const aiEnd = FN.indexOf('sendJson(res, 400, { error: "unknown_action" })');
+const nextAction = FN.indexOf('action === "', aiStart + 10);
+const aiEnd = nextAction > aiStart ? nextAction : FN.indexOf('sendJson(res, 400, { error: "unknown_action" })');
 const AIB = FN.slice(aiStart, aiEnd);
 
 /* 管理端 AI 面板整段 */

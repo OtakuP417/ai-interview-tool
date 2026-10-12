@@ -211,6 +211,18 @@ console.log('\n[1] 解析：归并规则 / 两种格式变体 / 六要素');
   ok(KB.MISSING_RE.test(c1.fields.boundary) === false,
     '★ MISSING_RE：含"未说明"但内容是有效边界的句子不判缺失', c1.fields.boundary);
 
+  /* ★ 2026-10-12：批量导入件（非访谈来源）的占位写「（稿子中未展开）」。
+     此前只认「访谈中」→ 导入件的诚实兜底会被当成正常字段值渲染出来。
+     放宽主语，但**必须仍不吞有效边界说明**（下面两条是配对的，不能只留一条）。 */
+  ['（稿子中未展开）', '（稿子中未提到）', '（稿子中未覆盖主题中的 XX）',
+   '稿子中未提供结果信息', '这一点稿子中未展开', '（材料中未明确）',
+  ].forEach(function (s) {
+    ok(KB.MISSING_RE.test(s) === true, 'MISSING_RE：导入件占位「' + s + '」判为缺失');
+  });
+  ok(KB.MISSING_RE.test('客户未提到过额度要求，但每次都会问利率') === false,
+    '★ MISSING_RE：句中出现"未提到"的正常内容不判缺失');
+  ok(KB.MISSING_RE.test('未') === false, 'MISSING_RE：单个"未"不判缺失');
+
   /* 原话抽取「」『』，且缺失说明不算原话 */
   ok(c1.quotes.length === 1 && c1.quotes[0] === '最近在忙什么', '原话抽取', JSON.stringify(c1.quotes));
   ok(c2.quotes.length === 0, '缺失说明里的括号内容不当原话');

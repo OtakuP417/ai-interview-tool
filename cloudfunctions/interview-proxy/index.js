@@ -39,6 +39,7 @@ const asr = require("./asr");
 const aiEditor = require("./ai-editor");
 const kb = require("./kb");
 const kbStage = require("./kb-stage");
+const importer = require("./importer");
 
 /**
  * CORS 由 CloudBase 网关统一注入。
@@ -1193,6 +1194,132 @@ function handleAdmin(req, res) {
               }
               sendJson(res, 502, { error: "ai_edit_failed", detail: msg.slice(0, 300) });
             });
+        });
+        return;
+      }
+
+      /* ── 批量导入（2026-10-12）：把已有访谈稿转写成报告 ──
+         用户导入 17 份「领航之声」历史访谈稿（15 人），形态混杂
+         （逐字问答转写稿 / 整理过的访谈记录 / 已写好的经验总结），
+         都要先转成 report_md 七节格式，经验库才解析得出卡片。
+
+         与 ai_edit 同一原则：**只生成、不写库**。中间隔一道人工校对 ——
+         批量导入写错一次，返工成本远高于先看一眼。写库走 import_insert。 */
+      if (action === "import_extract") {
+        const apiKey = env("DEEPSEEK_API_KEY", "");
+        if (!apiKey) {
+          sendJson(res, 500, { error: "server_not_configured" });
+          return;
+        }
+        const text = asText(body.text, 60000);
+        if (!text) {
+          sendJson(res, 400, { error: "text_required" });
+          return;
+        }
+        const doc = {
+          name: asText(body.name, 40),
+          position: asText(body.position, 40) || "咨询顾问",
+          topic: asText(body.topic, 120),
+          text: text,
+        };
+        if (!doc.name || !doc.topic) {
+          sendJson(res, 400, { error: "name_topic_required" });
+          return;
+        }
+        importer
+          .extractReport(doc, { apiKey: apiKey })
+          .then(function (out) {
+            sendJson(res, 200, Object.assign({ ok: true, name: doc.name, topic: doc.topic }, out));
+          })
+          .catch(function (e) {
+            const msg = String((e && e.message) || e);
+            /* 「模型返回空 content」是已知的上游现象（推理 token 吃掉预算），
+               回 200 + warnings 让人看到发生了什么，而不是一句 502 无从下手。 */
+            if (msg === "import_empty_content") {
+              sendJson(res, 200, {
+                ok: false,
+                error: msg,
+                name: doc.name,
+                /* 带上诊断：两次尝试各自的 finish_reason / 预算 / 推理长度 / 正文长度。
+                   只有一句「空内容」判断不出是预算不够还是提示词有问题。 */
+                diag: (e && e.diag) || null,
+                note: "模型这次返回了空内容（推理 token 吃掉了预算）。可以重试一次。",
+              });
+              return;
+            }
+            sendJson(res, 502, { error: "import_extract_failed", detail: msg.slice(0, 300) });
+          });
+        return;
+      }
+
+      /* ── 批量导入：写入一条报告记录 ──
+         ★ 为什么不走 handleSubmit：那条路径有「访谈未完成闸」（round_count >= 5），
+         而导入件根本没有"轮次"这个概念（它不是访谈工具产生的）。所以另开一条
+         **窄路径**：只做脱敏 + 节数校验，其余字段一律不由前端指定。
+
+         ★ 但节数闸必须保留：分隔符少于 5 个说明报告被截断了，
+         这种残缺报告进库会污染经验库索引 —— 不管从哪条路径进来都拦住。 */
+      if (action === "import_insert") {
+        const name = asText(body.name, 40);
+        const topic = asText(body.topic, 120);
+        const reportMd = maskSensitive(asText(body.report_md, 60000));
+
+        const missing = [];
+        if (!name) missing.push("被访谈人姓名");
+        if (!topic) missing.push("访谈主题");
+        if (!reportMd) missing.push("报告内容");
+        if (missing.length) {
+          sendJson(res, 400, { error: "missing_fields", fields: missing });
+          return;
+        }
+
+        const secCount = (reportMd.match(/---SECTION---/g) || []).length;
+        if (secCount < 5) {
+          sendJson(res, 400, { error: "report_sections_invalid", sections: secCount });
+          return;
+        }
+
+        /* 来源稿全文存进 transcript 位 —— 它是"这份报告是从什么转写出来的"的凭证。
+           以后要查"报告是不是漏读了原稿后段"（reportSpan 那类问题）时，
+           没有原文就无从复核。导入件没有对话记录，所以只有一条 user 消息。 */
+        const sourceText = asText(body.source_text, 60000);
+        const row = {
+          interviewee_name: name,
+          interviewee_position: asText(body.position, 40) || "咨询顾问",
+          interviewee_um: null,
+          city: asText(body.city, 40) || null,
+          topic: topic,
+          submitter_name: null,
+          backend_owner_name: asText(body.owner_name, 40) || null,
+          backend_owner_org: asText(body.owner_org, 80) || null,
+          round_count: 0,
+          report_md: reportMd,
+          transcript: sourceText
+            ? maskTranscript([{ role: "user", content: sourceText }])
+            : [],
+          gate_log: null,
+          /* 来源标记。写进 app_build 位（语义是"这条记录是哪个程序产生的"），
+             管理端详情的「程序版本」一栏就能一眼认出这是导入件而非本工具访谈。
+             不新增列是有意的：这一轮不改前端，避免连带 bump 版本号与断言。 */
+          app_build: asText(body.app_build, 40) || "import:linghang",
+          status: "待审",
+        };
+
+        pgRequest("POST", "", row, { Prefer: "return=representation" }).then(function (r) {
+          if (!r.ok) {
+            sendJson(res, 502, {
+              error: "db_write_failed",
+              status: r.status,
+              detail: r.data ? JSON.stringify(r.data).slice(0, 300) : "",
+            });
+            return;
+          }
+          const inserted = Array.isArray(r.data) ? r.data[0] : r.data;
+          sendJson(res, 200, {
+            ok: true,
+            id: inserted && inserted.id ? inserted.id : null,
+            name: name,
+          });
         });
         return;
       }
