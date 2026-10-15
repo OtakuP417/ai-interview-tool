@@ -41,6 +41,16 @@ const kb = require("./kb");
 const kbStage = require("./kb-stage");
 const importer = require("./importer");
 
+/* ★ 打标的 socket 超时：**必须显式传**，不能用 tagger 里的默认 60s。
+   2026-10-15 实测：deepseek-v4-flash 是推理模型，打标虽然只输出几十个 token，
+   但推理长度随报告长度增长且方差极大 —— 3703 字符的导入件（id 23）单次
+   150s 仍不返回。默认 60s 会把「上游慢」误判成 tag_timeout，
+   而 tag_timeout 落在 tagReport 的可重试清单里，于是再重试一次 60s…
+   一次请求白烧两分钟，批量脚本全部超时。
+   与 kb-stage 的 STAGE_TIMEOUT_MS（240s）同源：推理模型一律给足，
+   函数超时已放宽到 300s，留 60s 余量给写库。 */
+const TAG_TIMEOUT_MS = 240000;
+
 /**
  * CORS 由 CloudBase 网关统一注入。
  * 实测：网关会按请求 Origin 回填 Access-Control-Allow-Origin（并带
@@ -391,7 +401,7 @@ function autoTagById(id, row, apiKey) {
     .tagReport(row.report_md, {
       topic: row.topic,
       position: row.interviewee_position,
-    }, { apiKey: apiKey })
+    }, { apiKey: apiKey, timeoutMs: TAG_TIMEOUT_MS })
     .then(function (out) {
       const patch = {
         tags_model: out.tags_model,
@@ -917,6 +927,19 @@ function handleAdmin(req, res) {
         const force = body.force === true;
         const limit = Math.min(50, Math.max(1, Math.trunc(Number(body.limit) || 10)));
 
+        /* ★ 探针模式：只调模型、原样返回 finish_reason/usage/耗时，**不写任何库**。
+           为什么需要：打标失败在业务层只有一句 tag_empty_content，
+           但成因有三——① 推理吃光预算；② 上游慢到顶到 socket 超时；
+           ③ 模型没按格式输出。三者的修法完全不同。
+           与 kb_stage 的 probe 同构（那里也是先有了探针才定位到推理吃预算）。
+           用法：{"action":"retag","id":23,"probe":true,"maxTokens":4000} */
+        const probe = body.probe === true;
+        const wantTok = Math.trunc(Number(body.maxTokens) || 0);
+        const budget = wantTok > 0 ? Math.min(32000, Math.max(256, wantTok)) : 0;
+        /* 探针的 socket 超时也要可调：默认 60s 打标够用，但推理模型在长报告上
+           实测能到 100s+，探针要能观察到这个区间，否则「超时」本身就是被截断的观测。 */
+        const probeTimeout = Math.trunc(Number(body.timeoutMs) || 0) || 180000;
+
         const query = id
           ? "id=eq." + id + "&limit=1"
           : (force
@@ -933,6 +956,51 @@ function handleAdmin(req, res) {
             sendJson(res, 200, { ok: true, retagged: 0, results: [] });
             return;
           }
+
+          /* ★ 探针：只调模型、原样返回 finish_reason/usage/耗时，不写任何库。 */
+          if (probe) {
+            const prow = rows[0];
+            if (!prow.report_md) {
+              sendJson(res, 400, { error: "no_report_md", id: prow.id });
+              return;
+            }
+            const t0 = Date.now();
+            tagger
+              .callDeepseek(
+                apiKey,
+                tagger.buildTagPrompt(prow.report_md, {
+                  topic: prow.topic,
+                  position: prow.interviewee_position,
+                }),
+                tagger.DEFAULT_MODEL,
+                budget > 0 ? budget : 4000,
+                { raw: true, timeoutMs: probeTimeout }
+              )
+              .then(function (p) {
+                sendJson(res, 200, {
+                  ok: true,
+                  id: prow.id,
+                  elapsed_ms: Date.now() - t0,
+                  probe: {
+                    model: p.model,
+                    finish_reason: p.finish_reason,
+                    usage: p.usage,
+                    reasoning_len: String(p.reasoning || "").length,
+                    content_len: String(p.content || "").length,
+                    content_head: String(p.content || "").slice(0, 300),
+                  },
+                });
+              })
+              .catch(function (e) {
+                sendJson(res, 500, {
+                  id: prow.id,
+                  elapsed_ms: Date.now() - t0,
+                  error: String((e && e.message) || e).slice(0, 200),
+                });
+              });
+            return;
+          }
+
           /* 串行跑：并发打标会同时占多个 DeepSeek 连接，
              云函数实例只有 256MB，且没必要抢。 */
           let done = 0;
@@ -953,7 +1021,7 @@ function handleAdmin(req, res) {
               .tagReport(row.report_md, {
                 topic: row.topic,
                 position: row.interviewee_position,
-              }, { apiKey: apiKey })
+              }, { apiKey: apiKey, timeoutMs: TAG_TIMEOUT_MS })
               .then(function (out) {
                 const patch = {
                   tags_model: out.tags_model,
