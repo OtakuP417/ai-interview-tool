@@ -230,7 +230,7 @@ ok('详情有「重跑打标」按钮', /retagOne\(\$\{row\.id\}\)/.test(ADM));
 ok('retagOne 调用 retag 动作并刷新详情', /action: 'retag', id: id/.test(ADM) && /action: 'detail'/.test(ADM));
 ok('CSV 导出含 AI 主题与标签两列',
    /'AI 归纳主题','自动标签'/.test(ADM) && /r\.ai_topic \|\| ''/.test(ADM));
-ok('版本号已 bump（功能上线可远程确认）', /ADMIN_BUILD = 'v2026\.10\.12-c'/.test(ADM));
+require('./_build-version.js').assertBuildAtLeast(ok, 'admin.html', 'ADMIN_BUILD', 'v2026.10.12-c', '自动打标');
 
 console.log('');
 if (fail) { console.log('FAIL: ' + fail + ' 项未通过'); process.exit(1); }

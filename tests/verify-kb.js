@@ -554,9 +554,14 @@ console.log('\n[6] 版本号');
   /* ★ 只校验格式；精确值的唯一权威断言在 tests/verify-interventions.js */
   ok(/APP_BUILD = 'v20\d{2}\.\d{2}\.\d{2}-[a-z]'/.test(web), '访谈页 APP_BUILD 格式合法',
     (web.match(/APP_BUILD = '[^']*'/) || [''])[0]);
-  ok(/ADMIN_BUILD = 'v2026\.10\.12-c'/.test(adm), '管理端 ADMIN_BUILD（加知识库入口后 bump）',
+  /* 2026-10-15：改为「不早于」判定（本文件 ok 是先条件后名称，故不用公共模块的 assert） */
+  const BV = require('./_build-version.js');
+  ok(BV.buildAtLeast((adm.match(/ADMIN_BUILD = '([^']*)'/) || [])[1], 'v2026.10.12-c'),
+    '管理端 ADMIN_BUILD 不早于 v2026.10.12-c（知识库入口上线版本）',
     (adm.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
-  ok(/KB_BUILD = 'v2026\.10\.12-d'/.test(kbHtml), '知识库 KB_BUILD（换「哪些情况不适用」字段名后 bump）');
+  ok(BV.buildAtLeast((kbHtml.match(/KB_BUILD = '([^']*)'/) || [])[1], 'v2026.10.12-d'),
+    '知识库 KB_BUILD 不早于 v2026.10.12-d（换「哪些情况不适用」字段名的版本）',
+    (kbHtml.match(/KB_BUILD = '[^']*'/) || [''])[0]);
 }
 
 console.log('\n[8] ★ kb-stage.js：受约束输出 + 内容锚校验（两个已踩过的坑都要守住）');

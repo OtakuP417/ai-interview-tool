@@ -108,7 +108,8 @@ ok('无结果时给出明确文案',
 ok('已按标签精确筛时在统计行说明', /已按标签精确筛/.test(ADM));
 
 console.log('\n[8] 版本与样式');
-ok('★ 版本号已 bump 到 v2026.10.12-c', /ADMIN_BUILD = 'v2026\.10\.12-c'/.test(ADM));
+/* 2026-10-15：改为「不早于」判定，不再硬编码等值 —— 见 tests/_build-version.js 顶部注释 */
+require('./_build-version.js').assertBuildAtLeast(ok, 'admin.html', 'ADMIN_BUILD', 'v2026.10.12-c', '标签精确筛选');
 ok('搜索框样式已定义', /\.search-box/.test(ADM) && /\.search-clear/.test(ADM));
 ok('命中高亮样式已定义', /\.hit-on/.test(ADM) && /\.hit-badge/.test(ADM));
 ok('窄屏下筛选区会竖排（未破坏响应式）', /\.filters \{ flex-direction: column/.test(ADM));
