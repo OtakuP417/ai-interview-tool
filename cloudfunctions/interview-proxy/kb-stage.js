@@ -242,8 +242,12 @@ function normalizeStageResult(parsed, cards) {
 
 /* ───────────────────── 对外入口 ───────────────────── */
 
-const DEFAULT_MODEL = "deepseek-v4-flash";
-/* deepseek-v4-flash 是推理模型，推理 token 也计入 max_tokens 预算。
+const DEFAULT_MODEL = "deepseek-chat";
+/* ★ 2026-10-15 改为非推理模型：分类实测推理 token 起伏极大（4000–16000+），
+   deepseek-v4-flash 推理 token 也计入 max_tokens 预算，导致 content 为空或 socket 超时。
+   deepseek-chat 无推理开销，分类耗时稳定在 10–30s，与打标侧同步。
+   （原注释保留供排障参考）
+   原 deepseek-v4-flash 是推理模型，推理 token 也计入 max_tokens 预算。
    打标用 4000 够（输出只有几十个 token），但这里要逐条比对标题 + 判两个维度，
    实测推理 4000–8000+ token 起伏很大：给 4000 必被吃光（content 为空、finish_reason=length），
    给 8000 也仍有整份报告判不完的情况。所以给到 16000 留足余量。
