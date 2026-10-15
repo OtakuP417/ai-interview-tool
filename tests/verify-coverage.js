@@ -123,6 +123,9 @@ const code = [
   grab("const COVERAGE_DIMS = ["),
   grab("const COVERAGE_SECTION_ALIAS = {"),
   grab("const METHOD_SIGNAL_RE ="),
+  /* 2026-10-15 方法层判据拆成宽窄两档，窄档只给 methodInTalk 用。
+     这里必须一起抽进来，否则 assessCoverage 跑起来直接 ReferenceError。 */
+  grab("const METHOD_STRONG_RE = new RegExp(["),
   grab("function sectionMap(raw)"),
   grab("function isSubstantive(text)"),
   grab("function assessCoverage(raw, messages)"),
@@ -257,7 +260,9 @@ console.log("\n[7] 方法层的两个来源：报告里写了、对话里没支�
   const c = assessCoverage(reportOnly, mkMsgs(["客户是五金批发的，老客户介绍来的。", "就是服务做好一点。"]));
   const m = c.dims.find(d => d.k === "method");
   ok("方法层未通过", m.ok === false);
-  ok("提示语点明「对话中未见支撑」", m.note.indexOf("对话中未见支撑") >= 0, m.note);
+  /* 2026-10-15 文案随判据拆档一起改：原来说"对话中未见支撑"太抽象，
+     运营看不出要补什么；现在直接点出缺的是"频次/原话/怎么应对"。 */
+  ok("提示语点明顾问自己没讲出方法细节", /没讲出频次\/原话\/怎么应对/.test(m.note), m.note);
 }
 
 console.log("\n[8] 反证：短访谈（3 轮）但六维度齐备 → valuable 仍为真");

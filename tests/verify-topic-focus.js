@@ -122,7 +122,12 @@ console.log('\n[6] 稳定性：未完成访谈不出报告 + 只拦真正影响�
   ok(/function replyLooksBad/.test(web), '有回复质量校验 replyLooksBad');
   ok(/function repairReply/.test(web), '有回复重写 repairReply');
   ok(/结尾无标点 = 半句话/.test(web), '校验规则含「半句话被掐断」');
-  ok(/await repairReply\(msgs, full\)/.test(web), 'streamAI 在每轮结束后调用校验');
+  /* 2026-10-15：出站闸门由一道变两道（replyLooksBad / replyTooClosed），
+     repairReply 多了 mode 参数来分发纠错方向 —— 两类毛病的改法相反，
+     「多问/半句」要收敛到一个问题，「封闭式二选一」要展开成开放问法，
+     共用一套 fixPrompt 会互相抵消。所以这里断言的是带 mode 的调用。 */
+  ok(/await repairReply\(msgs, full, mode\)/.test(web), 'streamAI 在每轮结束后调用校验（带 mode 分发）');
+  ok(/function replyTooClosed/.test(web), '有第二道闸门 replyTooClosed（封闭式短问句）');
   ok(/push\.reset\(fixed\)/.test(web), '重写结果会替换已渲染的气泡');
   ok(/只重写一次，失败就保留原文/.test(web), '重写失败不阻断访谈');
 

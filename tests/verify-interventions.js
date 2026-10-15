@@ -67,7 +67,13 @@ console.log('\n[1] 注入判定真跑');
   const t3 = L1.interventions(streak3, TOPIC);
   ok(L1.shortStreak(streak3) === 3, '连续三轮短答被正确计数 = 3');
   ok(!!t3 && t3.indexOf('换访谈形态') >= 0, '连续三轮短答 → 注入「换访谈形态」');
-  ok(!!t3 && t3.indexOf('给一个猜测') >= 0, '注入的是「给一个猜测让他判断对错」这一种换法');
+  /* 2026-10-15：换法档位看累计 switch 次数，不看 streak 数值。
+     这里没传 events（= 本场还没换过形态）→ 必须是第 1 种「拿一单从头过一遍」。
+     原断言期望第 2 种，那是旧的 step = streak - SHORT_STREAK 口径。 */
+  ok(!!t3 && t3.indexOf('第 1 种') >= 0, '本场还没换过形态 → 先上第 1 种');
+  ok(!!t3 && t3.indexOf('那单') >= 0, '注入的是「拿一单从头过一遍」这一种换法');
+  const t3b = L1.interventions(streak3, TOPIC, [{ kind: 'switch' }]);
+  ok(!!t3b && t3b.indexOf('给一个猜测') >= 0, '已换过 1 次 → 升到「给一个猜测让他判断对错」');
   ok(!t3.includes('原样复述主题'), '主题已复述过，不再重复注入开场提示');
 
   /* 正例：连续两轮短答就该换形态（阈值 2026-10-15 由 3 降到 2） */
@@ -121,20 +127,35 @@ console.log('\n[1b] 换法必须递进，不能每轮重复刷同一条');
     return a;
   };
 
-  ok(L1.SHORT_SWITCH_WAYS.length === 3, '三种换法（与提示词①②③一一对应）');
-  // ★ 2026-10-15：SHORT_STREAK 3→2，换法顺序调整（叙事先行→猜测→用途说明）
-  ok(L1.interventions(mk(2), TOPIC).indexOf('第 1 种') >= 0, 'streak=2 → 第 1 种：拿一单从头过一遍');
-  ok(L1.interventions(mk(3), TOPIC).indexOf('第 2 种') >= 0, 'streak=3 → 第 2 种：给一个猜测让他判断对错');
-  ok(L1.interventions(mk(4), TOPIC).indexOf('第 3 种') >= 0, 'streak=4 → 第 3 种：说明细节的用途');
+  /* ★★ 2026-10-15 档位口径由「瞬时 streak」改为「累计 switch 次数」。
+     原因（回测 17 份归档）：shortStreak() 从最后一轮往回数，中间一轮长答就归零，
+     于是 step = streak - SHORT_STREAK 让递进链反复从第 1 种重新开始 ——
+     #20 的 streak 轨迹 1 2 3 0 1 0 0 1 2 3 0 … 归零后重新爬到 2 共 4 次，
+     switch 实打 10 次、三种换法轮播，全库 33 次 switch 只换来 3 次止损。
+     所以档位必须看「这一场已经换过几次形态」，而不是「眼下连续短答几轮」。
+     因此这里的夹具改成：短答轮数固定（只要 >= SHORT_STREAK 就够），
+     用 events 里的 switch / release 条数来驱动档位。 */
+  const sw = (n) => Array.from({ length: n }, () => ({ kind: 'switch' }));
 
-  const t5 = L1.interventions(mk(5), TOPIC);
-  ok(t5.indexOf('这一块先放下') >= 0, 'streak=5 → 止损（三种都试过了，如实记下、往下走）');
+  ok(L1.SHORT_SWITCH_WAYS.length === 3, '三种换法（与提示词①②③一一对应）');
+  ok(L1.interventions(mk(2), TOPIC, sw(0)).indexOf('第 1 种') >= 0, '换过 0 次 → 第 1 种：拿一单从头过一遍');
+  ok(L1.interventions(mk(2), TOPIC, sw(1)).indexOf('第 2 种') >= 0, '换过 1 次 → 第 2 种：给一个猜测让他判断对错');
+  ok(L1.interventions(mk(2), TOPIC, sw(2)).indexOf('第 3 种') >= 0, '换过 2 次 → 第 3 种：说明细节的用途');
+
+  /* 长答打断后 streak 归零，但累计次数不归零 —— 这正是本次要修的那个 bug */
+  const brokenThenShort = [SYS(), A('开场白'), U('我一般是先打电话过去问他有没有资金需求，有兴趣就约时间见面'), A('那你多久联系一次？'), U('嗯'), A('具体呢？'), U('还好')];
+  const tBroken = L1.interventions(brokenThenShort, TOPIC, sw(2));
+  ok(tBroken.indexOf('第 3 种') >= 0, '中间夹过长答也不会退回第 1 种（累计口径）');
+
+  const t5 = L1.interventions(mk(2), TOPIC, sw(3));
+  ok(t5.indexOf('这一块先放下') >= 0, '换过 3 次 → 止损（三种都试过了，如实记下、往下走）');
   ok(t5.indexOf('换访谈形态') < 0, '止损时不再出现「换访谈形态」');
   ok(t5.indexOf('不要反复纠缠同一件事') >= 0, '止损文案点明不许纠缠');
 
-  const t6 = L1.interventions(mk(6), TOPIC);
+  /* 止损只提一次：events 里已有 release 之后不再重复念 */
+  const t6 = L1.interventions(mk(2), TOPIC, sw(3).concat([{ kind: 'release' }]));
   ok(!t6 || (t6.indexOf('换访谈形态') < 0 && t6.indexOf('这一块先放下') < 0),
-    'streak>=6 → 不再重复注入（避免每轮刷屏）');
+    '止损提过一次后 → 不再重复注入（避免每轮刷屏）');
 
   /* 三种换法各自的内容要对得上，不能只是编号不同 */
   ok(L1.SHORT_SWITCH_WAYS[0].indexOf('那单') >= 0, '换法①含具体某一单（叙事先行）');
@@ -259,7 +280,8 @@ console.log('\n[3] 接入点：发送用的是注入后的消息');
   ok(/const reqMsgs = withIntervention\(msgs, tip\)/.test(web), '构造 reqMsgs');
   ok(/messages: buildContext\(reqMsgs\)/.test(web), '发送用的是 reqMsgs（不是 msgs）');
   ok(!/tip[\s\S]{0,100}?state\.messages\.push/.test(web), '注入内容不写进 state.messages');
-  ok(/repairReply\(msgs, full\)/.test(web), '重写仍用未注入的 msgs（重写不需要重复提示）');
+  /* 2026-10-15：repairReply 加了 mode 参数（bad / closed 两类毛病纠错方向相反） */
+  ok(/repairReply\(msgs, full, mode\)/.test(web), '重写仍用未注入的 msgs（重写不需要重复提示）');
 }
 
 console.log('\n[4] L2 冲突消解');
@@ -348,7 +370,7 @@ console.log('\n[6] L4 可观测性：注入与闸门事件');
 
 console.log('\n[5] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.15-b'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.15-b');
+  ok(/APP_BUILD = 'v2026\.10\.15-c'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.15-c');
 }
 
 console.log('\n' + (fail ? '✗' : '✓') + ' 通过 ' + pass + ' 项，失败 ' + fail + ' 项\n');

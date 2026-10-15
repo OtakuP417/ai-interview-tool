@@ -18,6 +18,21 @@ const PW = loadPassword();
 let fail = 0;
 const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; console.log('  ✗ ' + n + (x ? '  → ' + x : '')); } };
 
+/* ★ 2026-10-15：版本号期望值不再写死。
+   踩过的坑：这里原来硬编码 v2026.10.12-g，本地 bump 到 -c 后这项一直红，
+   而输出里又恰好印着新版本号（因为失败信息就是实际值），
+   被当成「CDN 缓存时序」误判了一整轮。
+   现在改为从本地源文件读 —— 本地改了版本号，期望值自动跟着走，
+   这项红就只剩一个含义：线上还没部署到最新。 */
+function localBuild(file, name) {
+  const p = path.join(__dirname, '..', 'web', file);
+  const m = fs.readFileSync(p, 'utf8').match(new RegExp(name + " = '([^']+)'"));
+  if (!m) { console.error('本地 ' + file + ' 里找不到 ' + name); process.exit(2); }
+  return m[1];
+}
+const EXPECT_APP_BUILD = localBuild('index.html', 'APP_BUILD');
+const EXPECT_ADMIN_BUILD = localBuild('admin.html', 'ADMIN_BUILD');
+
 (async () => {
   const T = Date.now();
   const get = async (u) => { const r = await fetch(u + (u.includes('?') ? '&' : '?') + 't=' + T, { headers: { 'Cache-Control': 'no-cache' } }); return { s: r.status, t: await r.text() }; };
@@ -68,7 +83,19 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
   ok('线上含节标题归一（normalizeReport）',
     /function normalizeReport\(/.test(idx.t) && /const normalized = normalizeReport\(raw\)/.test(idx.t));
 
-  ok('版本号已更新', /v2026\.10\.12-g/.test(idx.t), (idx.t.match(/APP_BUILD = '[^']*'/) || [''])[0]);
+  /* 2026-10-15 本轮五项优化（#64–#68）的线上存在性 */
+  ok('线上含第二道出站闸门（封闭式短问句）',
+    /function replyTooClosed/.test(idx.t) && /CLOSED_GATE_MAX_HITS/.test(idx.t));
+  ok('线上 repairReply 已按毛病类型分流（mode）', /repairReply\(msgs, full, mode\)/.test(idx.t));
+  ok('线上方法层判据已拆宽窄两档', /const METHOD_STRONG_RE = new RegExp\(\[/.test(idx.t));
+  ok('线上止损改按累计干预次数（非瞬时 streak）',
+    /countKind\(ev, 'switch'\)/.test(idx.t) && /countKind\(ev, 'release'\)/.test(idx.t));
+  ok('线上提示词已删除被数据否证的「问得越长答得越短」',
+    !/你问得越长，对方答得越短/.test(idx.t) && /把答案选项摆给对方/.test(idx.t));
+
+  ok('访谈页版本号与本地一致（' + EXPECT_APP_BUILD + '）',
+    idx.t.indexOf("APP_BUILD = '" + EXPECT_APP_BUILD + "'") > 0,
+    '线上为 ' + (idx.t.match(/APP_BUILD = '[^']*'/) || ['(未找到)'])[0]);
 
   console.log('\n[1b] 线上已含语音输入（方案B：腾讯云一句话识别）');
   ok('线上有麦克风按钮', /id="mic-btn"/.test(idx.t) && /function micToggle\(/.test(idx.t));
@@ -107,7 +134,9 @@ const ok = (n, c, x) => { if (c) console.log('  ✓ ' + n); else { fail++; conso
       (i === 0 || adm.t.indexOf("k: '" + k + "'") > adm.t.indexOf("k: '" + arr[i - 1] + "'")))
     && /有内容但没数字，说服力偏弱/.test(adm.t));
   ok('后台覆盖度已挂进详情渲染', /id="img-box"[\s\S]{0,80}renderCovBar\(row\)/.test(adm.t) || /\$\{renderCovBar\(row\)\}/.test(adm.t));
-  ok('版本号已更新', /v2026\.10\.12-c/.test(adm.t), (adm.t.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);
+  ok('管理端版本号与本地一致（' + EXPECT_ADMIN_BUILD + '）',
+    adm.t.indexOf("ADMIN_BUILD = '" + EXPECT_ADMIN_BUILD + "'") > 0,
+    '线上为 ' + (adm.t.match(/ADMIN_BUILD = '[^']*'/) || ['(未找到)'])[0]);
 
   console.log('\n[2b] 线上已含主题回归 + 自动打标（P2）');
   ok('线上管理页显示 AI 归纳主题', /AI 归纳：/.test(adm.t));

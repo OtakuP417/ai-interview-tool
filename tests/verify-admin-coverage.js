@@ -91,6 +91,8 @@ function grab(src, marker) {
 const code = [
   grab(ADMIN, 'const COV_DIMS = ['),
   grab(ADMIN, 'const COV_METHOD_RE ='),
+  /* 2026-10-15：窄档（顾问原话必须讲出频次/原话/应对），与访谈端同口径 */
+  grab(ADMIN, 'const COV_METHOD_STRONG_RE = new RegExp(['),
   grab(ADMIN, 'function covSectionMap(raw)'),
   grab(ADMIN, 'function covSubstantive(text)'),
   grab(ADMIN, 'function assessCoverageAdmin(raw, transcript)'),

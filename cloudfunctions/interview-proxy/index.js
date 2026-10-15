@@ -434,6 +434,8 @@ const GATE_LOG_KINDS = [
   "inject_opener", "inject_switch", "inject_release", "inject_number", "inject_boundary",
   "inject_hardest_moment", "inject_decode",
   "gate_fixed", "gate_unfixed",
+  // 2026-10-15：封闭式短问句闸门（回复本身合规，但把答案选项摆给了对方）
+  "gate_closed_fixed", "gate_closed_unfixed",
 ];
 function cleanGateLog(v) {
   if (!Array.isArray(v)) return null;

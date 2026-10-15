@@ -642,7 +642,25 @@ const COV_DIMS = [
   { k: 'decision',   label: '判断与取舍', probe: '当时怎么判断的、为什么这么选', alias: ['关键判断与取舍', '关键判断'] },
   { k: 'pitfall',    label: '新人易踩的坑', probe: '新人做这件事容易错在哪',    alias: ['新人容易踩的坑', '新人注意事项', '新人避坑', '避坑提示'] },
 ];
+/* 与访谈端 METHOD_SIGNAL_RE / METHOD_STRONG_RE 同口径（2026-10-15 拆档）。
+   宽档判报告正文（模型必然写方法词，收严无区分力），
+   窄档判顾问原话（光说"电话""微信"不算讲出做法）。两端口径必须一致，
+   否则同一份报告在访谈页说"够用"、在管理端说"不够"。 */
 const COV_METHOD_RE = /(每周|每月|每天|每隔|一次|第\s*\d+\s*天|多久|频次|时机|微信|电话|当面|拉群|朋友圈|名单|系统|原话|开场|说"|说「|对方没反应|不回|拒绝|拖延|怎么办)/;
+
+const COV_METHOD_STRONG_RE = new RegExp([
+  '每周', '每月', '每天', '每隔', '隔\\s*[一二两三四五六七八九十半\\d]+\\s*[天周月]',
+  '第\\s*[\\d一二三四五六七八九十]+\\s*天', '[一二两三四五六七八九十半\\d]+\\s*天一次',
+  '[一二两三四五六七八九十半\\d]+\\s*[周月]一次', '多久一次', '多久联系', '频次',
+  '定期(回访|跟进|联系|联络)', '(回访|跟进|联系)一下', '旺季', '淡季', '用款时间', '回访时间',
+  '原话', '第一句', '开场就说', '开场说', '我就说', '我会说', '我一般说', '我都说',
+  '就给(他|客户)说', '就跟他说', '跟客户说', '自报家门', '话术', '这么说的', '怎么开口',
+  '不回(我|消息|信息)?', '没反应', '拒绝', '拖延', '不需要', '嫌(贵|高)', '砍价',
+  '怎么办', '不灵', '不管用', '放弃', '没遇到什么问题', '有没有遇到',
+  '加(了)?微信(之?后|后)', '打(了)?电话(过去|给)', '约(他|客户)?(出来)?见面',
+  '拉(了)?群', '发(了)?朋友圈', '上门', '跑市场', '设(了)?提醒', '记在',
+  '带(客户|他)(到|去)', '指导客户', '帮(客户|他)(约|办|查|调)', '陪(客户|他)(去|到)',
+].join('|'));
 
 function covSectionMap(raw) {
   const out = {};
@@ -674,14 +692,14 @@ function assessCoverageAdmin(raw, transcript) {
     .map(m => String(m.content || '')).join('\n');
 
   const methodInReport = Object.keys(secs).some(t => COV_METHOD_RE.test(secs[t] || ''));
-  const methodInTalk = COV_METHOD_RE.test(userText);
+  const methodInTalk = COV_METHOD_STRONG_RE.test(userText);
 
   const dims = COV_DIMS.map(d => {
     let ok = false, note = '';
     if (d.k === 'method') {
       ok = methodInReport && methodInTalk;
-      note = ok ? '频次/话术/载体等细节有据可查'
-        : (methodInReport ? '报告里有方法层表述，但对话中未见支撑'
+      note = ok ? '频次/话术/应对等细节有据可查'
+        : (methodInReport ? '报告写了方法，但顾问原话没讲出频次/原话/怎么应对'
           : (methodInTalk ? '对话里提到过，但没写进报告' : '还没问到具体怎么做'));
     } else {
       const hitKey = d.alias.find(a => secs[a] != null)
@@ -1123,9 +1141,15 @@ const GATE_LOG_LABELS = {
   inject_switch: '连续短答未换形态',
   inject_release: '换法用尽未止损',
   inject_number: '数字未问来路',
-  inject_boundary: '未问失效边界',
+  inject_boundary: '未问哪些情况不适用',
+  inject_hardest_moment: '未问最难的那一刻',
+  inject_decode: '未做解码追问',
   gate_fixed: '回复不合格 · 已重写',
   gate_unfixed: '回复不合格 · 重写未成功',
+  /* 2026-10-15：封闭式短问句（把答案选项摆给对方，顾问只需勾一个）。
+     与上面两类是不同毛病 —— 那两类是回复有硬伤，这一类是回复"合规但无效"。 */
+  gate_closed_fixed: '封闭式提问 · 已改开放式',
+  gate_closed_unfixed: '封闭式提问 · 重写未成功',
 };
 
 /* 这份报告由哪一版前端产出。
