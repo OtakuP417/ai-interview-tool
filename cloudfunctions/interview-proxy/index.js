@@ -432,7 +432,7 @@ function autoTagById(id, row, apiKey) {
    这一列是给统计用的，不该变成任意 JSON 的入库入口。 */
 const GATE_LOG_KINDS = [
   "inject_opener", "inject_switch", "inject_release", "inject_number", "inject_boundary",
-  "inject_hardest_moment",
+  "inject_hardest_moment", "inject_decode",
   "gate_fixed", "gate_unfixed",
 ];
 function cleanGateLog(v) {

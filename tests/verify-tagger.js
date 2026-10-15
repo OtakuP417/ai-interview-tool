@@ -180,7 +180,15 @@ ok('retag 需要有效 token（在鉴权之后）',
    FN.indexOf('action === "retag"') > FN.indexOf('verifyToken(body.token, body.exp)'));
 ok('单条模式按 id 查', /const query = id\s*\n?\s*\?/.test(FN));
 ok('批量默认只补未打标的（tags_at=is.null）', /tags_at=is\.null/.test(FN));
-ok('force=true 时忽略已打标状态', /force[\s\S]{0,80}\?[^?]*order=id\.desc/.test(FN));
+/* ★ 2026-10-15：原断言限定 force 与 ? 之间 ≤80 字符，中间加了三行注释就红。
+   改成语义校验：force 分支的查询串里不得带 tags_at=is.null（即忽略已打标状态）。 */
+{
+  const forceBranch = FN.slice(FN.indexOf('const force = body.force === true;'));
+  const forceQuery = (forceBranch.match(/\?\s*"select=id,report_md[^"]*"/) || [''])[0];
+  ok('force=true 时忽略已打标状态（查询串不带 tags_at=is.null）',
+     !!forceQuery && forceQuery.indexOf('tags_at=is.null') < 0 && forceQuery.indexOf('order=id.desc') >= 0,
+     forceQuery);
+}
 ok('批量限量（防一次打太多）', /Math\.min\(50,/.test(FN));
 ok('串行执行（注释说明了原因）', /串行跑/.test(FN) && /next\(i \+ 1\)/.test(FN));
 ok('回传原始 topic 便于对照', /topic_original:\s*row\.topic/.test(FN));

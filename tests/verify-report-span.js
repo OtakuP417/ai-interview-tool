@@ -114,7 +114,8 @@ console.log('\n[3] 生成端的素材取舍要求');
 
 console.log('\n[4] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-g'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-g',
+  /* ★ 只校验格式；精确值的唯一权威断言在 tests/verify-interventions.js */
+  ok(/APP_BUILD = 'v20\d{2}\.\d{2}\.\d{2}-[a-z]'/.test(web), 'APP_BUILD 格式合法（vYYYY.MM.DD-x）',
     (web.match(/APP_BUILD = '[^']*'/) || [''])[0]);
 }
 

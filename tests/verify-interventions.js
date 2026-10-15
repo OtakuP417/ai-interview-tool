@@ -70,11 +70,17 @@ console.log('\n[1] 注入判定真跑');
   ok(!!t3 && t3.indexOf('给一个猜测') >= 0, '注入的是「给一个猜测让他判断对错」这一种换法');
   ok(!t3.includes('原样复述主题'), '主题已复述过，不再重复注入开场提示');
 
-  /* 反例①：只连续两轮短答 —— 不该换形态（单轮短是正常口语） */
-  const streak2 = [SYS(), A('x'), U('都会说'), A('y'), U('没有固定')];
-  ok(L1.shortStreak(streak2) === 2, '两轮短答计数 = 2');
-  const t2 = L1.interventions(streak2, TOPIC);
-  ok(!t2 || t2.indexOf('换访谈形态') < 0, '只连续两轮短答 → 不注入换形态（阈值是 3）');
+  /* 正例：连续两轮短答就该换形态（阈值 2026-10-15 由 3 降到 2） */
+  const streak1 = [SYS(), A('x'), U('都会说'), A('y'), U('没有固定')];
+  ok(L1.shortStreak(streak1) === 2, '两轮短答计数 = 2');
+  const t1 = L1.interventions(streak1, TOPIC);
+  ok(!!t1 && t1.indexOf('换访谈形态') >= 0, '连续两轮短答 → 触发换形态（阈值是 2）');
+
+  /* 反例①：最后一轮是长答 —— streak 归零，不该换形态 */
+  const streakLong = [SYS(), A('x'), U('都会说'), A('y'), U('我一般是先打电话问有没有需求然后约见面聊')];
+  ok(L1.shortStreak(streakLong) === 0, '最后一轮长答 → streak=0');
+  const tLong = L1.interventions(streakLong, TOPIC);
+  ok(!tLong || tLong.indexOf('换访谈形态') < 0, '最后一轮长答 → 不注入换形态');
 
   /* 反例②：短答被一句长答打断，streak 必须归零 */
   const broken = [SYS(), A('x'), U('都会说'), U('没有固定'),
@@ -116,22 +122,23 @@ console.log('\n[1b] 换法必须递进，不能每轮重复刷同一条');
   };
 
   ok(L1.SHORT_SWITCH_WAYS.length === 3, '三种换法（与提示词①②③一一对应）');
-  ok(L1.interventions(mk(3), TOPIC).indexOf('第 1 种') >= 0, 'streak=3 → 第 1 种：给一个猜测让他判断对错');
-  ok(L1.interventions(mk(4), TOPIC).indexOf('第 2 种') >= 0, 'streak=4 → 第 2 种：拿一单从头过一遍');
-  ok(L1.interventions(mk(5), TOPIC).indexOf('第 3 种') >= 0, 'streak=5 → 第 3 种：说明细节的用途');
+  // ★ 2026-10-15：SHORT_STREAK 3→2，换法顺序调整（叙事先行→猜测→用途说明）
+  ok(L1.interventions(mk(2), TOPIC).indexOf('第 1 种') >= 0, 'streak=2 → 第 1 种：拿一单从头过一遍');
+  ok(L1.interventions(mk(3), TOPIC).indexOf('第 2 种') >= 0, 'streak=3 → 第 2 种：给一个猜测让他判断对错');
+  ok(L1.interventions(mk(4), TOPIC).indexOf('第 3 种') >= 0, 'streak=4 → 第 3 种：说明细节的用途');
+
+  const t5 = L1.interventions(mk(5), TOPIC);
+  ok(t5.indexOf('这一块先放下') >= 0, 'streak=5 → 止损（三种都试过了，如实记下、往下走）');
+  ok(t5.indexOf('换访谈形态') < 0, '止损时不再出现「换访谈形态」');
+  ok(t5.indexOf('不要反复纠缠同一件事') >= 0, '止损文案点明不许纠缠');
 
   const t6 = L1.interventions(mk(6), TOPIC);
-  ok(t6.indexOf('这一块先放下') >= 0, 'streak=6 → 止损（三种都试过了，如实记下、往下走）');
-  ok(t6.indexOf('换访谈形态') < 0, '止损时不再出现「换访谈形态」');
-  ok(t6.indexOf('不要反复纠缠同一件事') >= 0, '止损文案点明不许纠缠');
-
-  const t7 = L1.interventions(mk(7), TOPIC);
-  ok(!t7 || (t7.indexOf('换访谈形态') < 0 && t7.indexOf('这一块先放下') < 0),
-    'streak>=7 → 不再重复注入（避免每轮刷屏）');
+  ok(!t6 || (t6.indexOf('换访谈形态') < 0 && t6.indexOf('这一块先放下') < 0),
+    'streak>=6 → 不再重复注入（避免每轮刷屏）');
 
   /* 三种换法各自的内容要对得上，不能只是编号不同 */
-  ok(L1.SHORT_SWITCH_WAYS[0].indexOf('我猜') >= 0, '换法①含具体例句（我猜…）');
-  ok(L1.SHORT_SWITCH_WAYS[1].indexOf('那单') >= 0, '换法②指向具体某一单');
+  ok(L1.SHORT_SWITCH_WAYS[0].indexOf('那单') >= 0, '换法①含具体某一单（叙事先行）');
+  ok(L1.SHORT_SWITCH_WAYS[1].indexOf('我猜') >= 0, '换法②含具体例句（我猜…）');
   ok(L1.SHORT_SWITCH_WAYS[2].indexOf('给新人') >= 0, '换法③说明细节用途');
 }
 
@@ -264,8 +271,8 @@ console.log('\n[4] L2 冲突消解');
 
   ok(!/少于 8 个字/.test(web), '旧的「少于 8 个字」已消失');
   ok(/去掉标点后少于 10 个字/.test(web), '短答阈值统一为 10 字');
-  ok(/连着 3 轮他都答得很短（10 字以内）/.test(web), '「连续 3 轮短答」也是 10 字 —— 两处口径一致');
-  ok(L1.SHORT_ANSWER_MAX === 10 && L1.SHORT_STREAK === 3, '代码阈值 = 提示词阈值（10 / 3）');
+  ok(/连着 2 轮他都答得很短（10 字以内）/.test(web), '「连续 2 轮短答」也是 10 字 —— 两处口径一致');
+  ok(L1.SHORT_ANSWER_MAX === 10 && L1.SHORT_STREAK === 2, '代码阈值 = 提示词阈值（10 / 2）');
 
   ok(!/破冰 \+ 确认主题（\d+-\d+轮）/.test(web), '访谈框架已删掉维度轮数建议');
   ok(!/背景了解（\d+-\d+轮）/.test(web), '背景了解也删了轮数');
@@ -341,7 +348,7 @@ console.log('\n[6] L4 可观测性：注入与闸门事件');
 
 console.log('\n[5] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-g'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.12-g');
+  ok(/APP_BUILD = 'v2026\.10\.15-b'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.15-b');
 }
 
 console.log('\n' + (fail ? '✗' : '✓') + ' 通过 ' + pass + ' 项，失败 ' + fail + ' 项\n');

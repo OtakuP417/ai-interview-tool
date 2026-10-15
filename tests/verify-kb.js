@@ -551,7 +551,8 @@ console.log('\n[5] 三端互不越界');
 
 console.log('\n[6] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.12-g'/.test(web), '访谈页 APP_BUILD',
+  /* ★ 只校验格式；精确值的唯一权威断言在 tests/verify-interventions.js */
+  ok(/APP_BUILD = 'v20\d{2}\.\d{2}\.\d{2}-[a-z]'/.test(web), '访谈页 APP_BUILD 格式合法',
     (web.match(/APP_BUILD = '[^']*'/) || [''])[0]);
   ok(/ADMIN_BUILD = 'v2026\.10\.12-c'/.test(adm), '管理端 ADMIN_BUILD（加知识库入口后 bump）',
     (adm.match(/ADMIN_BUILD = '[^']*'/) || [''])[0]);

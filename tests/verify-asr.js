@@ -107,7 +107,11 @@ ok("失败不阻断打字（用轻提示不用 alert）", /function micToast/.te
 ok("用后释放麦克风与音频上下文", /getTracks\(\)\.forEach/.test(WEB) && /micCtx\.close\(\)/.test(WEB));
 
 console.log("\n[7] 版本号");
-ok("index.html APP_BUILD 已 bump 到 v2026.10.12-g", /APP_BUILD = 'v2026\.10\.12-g'/.test(WEB));
+/* ★ 2026-10-15：只校验格式，不钉死具体值。
+   精确版本号的唯一权威断言在 tests/verify-interventions.js，
+   原来 4 套护栏各自硬编码同一个字符串，每次 bump 都要手改 4 个文件。 */
+ok("index.html 有合法的 APP_BUILD（格式 vYYYY.MM.DD-x）",
+  /APP_BUILD = 'v20\d{2}\.\d{2}\.\d{2}-[a-z]'/.test(WEB));
 
 console.log("\n[12] ★★★ 接口 URL 拼接契约（2026-09-29 十轮排查最终根因，绝不许回归）");
 ok("★★ 常量已改名 API_ORIGIN（语义=域名根，避免再被误读成「含 /api 的基址」）",
