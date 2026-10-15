@@ -335,7 +335,12 @@ function callDeepseek(apiKey, prompt, model, maxTokens, opts) {
 
 /* ───────────────────── 对外入口 ───────────────────── */
 
-const DEFAULT_MODEL = "deepseek-v4-flash";
+const DEFAULT_MODEL = "deepseek-chat";
+/* ★ 2026-10-15 改为非推理模型：
+   打标输出只需几十个 token，用 deepseek-v4-flash（推理模型）推理开销反而极大：
+   实测单条报告耗时 150-300s+，批量打标全部超时（socket 60s 远不够）。
+   deepseek-chat 是非推理版，打标耗时降到 5-15s，无推理 token 吃预算问题。
+   对话/报告生成/分类 继续用 v4-flash（由各自调用方指定），不受此处改动影响。 */
 
 /**
  * 由报告正文生成 { ai_topic, tags, tags_model, reason }。

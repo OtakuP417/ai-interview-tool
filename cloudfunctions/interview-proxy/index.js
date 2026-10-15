@@ -432,6 +432,7 @@ function autoTagById(id, row, apiKey) {
    这一列是给统计用的，不该变成任意 JSON 的入库入口。 */
 const GATE_LOG_KINDS = [
   "inject_opener", "inject_switch", "inject_release", "inject_number", "inject_boundary",
+  "inject_hardest_moment",
   "gate_fixed", "gate_unfixed",
 ];
 function cleanGateLog(v) {
@@ -603,7 +604,7 @@ function handleAdmin(req, res) {
       /* ── 列表 ── */
       if (action === "list") {
         const params = [
-          "select=id,created_at,city,interviewee_name,interviewee_position,interviewee_um,topic,ai_topic,tags,tags_at,tags_model,submitter_name,backend_owner_name,backend_owner_org,round_count,status,mail_sent_at",
+          "select=id,created_at,city,interviewee_name,interviewee_position,interviewee_um,topic,ai_topic,tags,tags_at,tags_model,submitter_name,backend_owner_name,backend_owner_org,round_count,status,mail_sent_at,app_build",
           "order=created_at.desc",
         ];
 
@@ -943,7 +944,10 @@ function handleAdmin(req, res) {
         const query = id
           ? "id=eq." + id + "&limit=1"
           : (force
-              ? "select=id,report_md,topic,interviewee_position&order=id.desc&limit=" + limit
+              /* ★ force=true 每次最多只取 1 条：打标实测单条耗时 5-40s（已换 deepseek-chat），
+                 云函数硬超时 300s，串行多条仍有风险。调用方应逐条循环，不要依赖服务端批跑。
+                 之前 limit 上限是 50，但云函数套 DeepSeek 串行的实际安全上限是 1。 */
+              ? "select=id,report_md,topic,interviewee_position&order=id.desc&limit=1"
               : "select=id,report_md,topic,interviewee_position&tags_at=is.null&order=id.desc&limit=" + limit);
 
         pgRequest("GET", query, null).then(function (r) {
