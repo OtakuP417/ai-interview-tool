@@ -257,18 +257,26 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
 .msg.user { flex-direction: row-reverse; }
 
 .avatar {
-  width: 30px; height: 30px; border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 500;
   flex-shrink: 0; margin-top: 2px;
+  overflow: hidden;
 }
-.avatar.ai { background: var(--accent); color: #fff; }
+.avatar.ai {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.avatar.ai svg { width: 22px; height: 22px; display: block; }
+/* 图片位：根目录放 ai-avatar.png 即整体替换内置形象（启动时探测一次） */
+.avatar .av-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar.user-av { background: var(--surface3); color: var(--text-muted); border: 0.5px solid var(--border); }
 
 .bubble {
   max-width: min(80%, 480px);
   padding: 10px 14px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   font-size: 13.5px;
   line-height: 1.65;
   white-space: pre-wrap;
@@ -279,19 +287,29 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
   border: 0.5px solid var(--border);
   border-top-left-radius: 4px;
   color: var(--text);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 .msg.user .bubble {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: #fff;
   border-top-right-radius: 4px;
+  box-shadow: 0 2px 8px -3px color-mix(in srgb, var(--accent) 40%, transparent);
 }
+/* 流式输出中的光标：正文 growing 时持续闪烁，本轮结束 push.done() 摘掉 */
+.bubble.streaming .typing-content::after {
+  content: '▍';
+  color: var(--accent);
+  margin-left: 1px;
+  animation: caret 0.9s steps(1) infinite;
+}
+@keyframes caret { 50% { opacity: 0; } }
 
 .typing-indicator {
   display: flex; gap: 4px; align-items: center; padding: 12px 14px;
 }
 .typing-dot {
   width: 6px; height: 6px; border-radius: 50%;
-  background: var(--text-hint);
+  background: var(--accent);
   animation: pulse 1.2s ease-in-out infinite;
 }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
@@ -323,14 +341,19 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.55; }
   line-height: 1.5;
   overflow-y: auto;
 }
-.input-area textarea:focus { border-color: var(--accent); background: var(--surface); }
+.input-area textarea:focus {
+  border-color: var(--accent); background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: none;
+}
 .send-btn {
   width: 40px; height: 40px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   border: none; border-radius: var(--radius);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0;
-  transition: background 0.15s;
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: background 0.15s, box-shadow 0.15s;
 }
 .send-btn:hover { background: var(--accent-hover); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -819,7 +842,7 @@ const BUILT_IN_API_KEY = '';
    用途：手机上缓存极难清，同事说"看不到新功能"时，
    让他看设置页底部这一行报给你，就能立刻判断他跑的是哪一版。
    改这里的同时记得同步 admin.html 的同名常量。 */
-const APP_BUILD = 'v2026.10.15-c';
+const APP_BUILD = 'v2026.10.15-d';
 
 /* file:// 环境检测：显示顶部警告（详见 body 内 #file-proto-warn 注释） */
 if (typeof location !== 'undefined' && location.protocol === 'file:') {
@@ -2829,18 +2852,45 @@ function updateRoundBadge() {
   }
 }
 
+/* ─── AI 头像 ───────────────────────────────────────────────
+   默认形象：自创极简蓝鲸（一体化轮廓 + 月牙尾鳍 + 喷水），白色描在
+   主题色渐变圆底上。想换形象不用改代码——把 ai-avatar.png 放到静态
+   托管根路径即可，启动时探测一次，命中后连已渲染的消息一起刷新。
+   （不逐条消息挂 onerror：头像没有时那等于每条消息各发一次 404。） */
+const AI_AVATAR_SVG = `
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path fill="currentColor" d="M4.2 18.2 Q4.2 11.2 12.8 11.2 Q20.6 11.2 22.6 15.4 L25.2 11.8 Q26.2 10.6 26 12.2 L25.4 16.4 Q25.3 17.4 25.5 18.6 L26.2 23 Q26.4 24.6 25.3 23.4 L22.8 20.8 Q20.4 24.8 12.8 24.8 Q4.2 24.8 4.2 18.2 Z"/>
+  <circle cx="9.4" cy="16.6" r="1.45" fill="var(--accent)"/>
+  <path d="M5.5 20.6 Q7 21.8 8.9 21.5" stroke="var(--accent)" stroke-width="0.9" stroke-linecap="round" fill="none" opacity="0.55"/>
+  <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5">
+    <path d="M9.8 9 V6.6"/>
+    <path d="M12.6 8.2 Q14.4 7.4 15 5.6"/>
+  </g>
+</svg>`;
+let AI_AVATAR_HTML = AI_AVATAR_SVG;
+(function probeAvatar() {
+  const probe = new Image();
+  probe.onload = () => {
+    AI_AVATAR_HTML = '<img class="av-img" src="ai-avatar.png" alt="">';
+    /* 探测完成前可能已有消息上屏（开场白），把旧头像一并换成图片 */
+    document.querySelectorAll('.avatar.ai').forEach(el => { el.innerHTML = AI_AVATAR_HTML; });
+  };
+  probe.src = 'ai-avatar.png';
+})();
+function aiAvatarHtml() { return AI_AVATAR_HTML; }
+
 function appendMsg(role, content, streaming = false) {
   const wrap = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
-  const initials = role === 'user' ? '我' : 'AI';
   div.innerHTML = `
-    <div class="avatar ${role === 'user' ? 'user-av' : 'ai'}">${initials}</div>
+    <div class="avatar ${role === 'user' ? 'user-av' : 'ai'}">${role === 'user' ? '我' : aiAvatarHtml()}</div>
     <div class="bubble" id="bubble-${Date.now()}">${streaming ? '<span class="typing-content"></span>' : escHtml(content)}</div>`;
   wrap.appendChild(div);
   wrap.scrollTop = wrap.scrollHeight;
   if (streaming) {
     const inner = div.querySelector('.typing-content');
+    div.querySelector('.bubble').classList.add('streaming');
     const push = (chunk) => {
       inner.textContent += chunk;
       wrap.scrollTop = wrap.scrollHeight;
@@ -2851,6 +2901,10 @@ function appendMsg(role, content, streaming = false) {
       inner.textContent = text;
       wrap.scrollTop = wrap.scrollHeight;
     };
+    /* 本轮流式输出结束：摘掉闪烁光标。 */
+    push.done = () => {
+      div.querySelector('.bubble').classList.remove('streaming');
+    };
     return push;
   }
 }
@@ -2859,7 +2913,7 @@ function showTyping() {
   const wrap = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = 'msg ai'; div.id = 'typing-msg';
-  div.innerHTML = `<div class="avatar ai">AI</div>
+  div.innerHTML = `<div class="avatar ai">${aiAvatarHtml()}</div>
     <div class="bubble"><div class="typing-indicator">
       <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
     </div></div>`;
@@ -2976,6 +3030,7 @@ async function streamAI(injectedUserMsg = null) {
       }
     }
 
+    push.done();   // 流式输出结束，摘掉闪烁光标
     state.messages.push({ role: 'assistant', content: full });
 
     /* 回复质量兜底（2026-10-10）：
@@ -3007,6 +3062,8 @@ async function streamAI(injectedUserMsg = null) {
     else if (closedBefore) pushEvent(fixed ? 'gate_closed_fixed' : 'gate_closed_unfixed', countRounds(state.messages));
 
   } catch (e) {
+    /* 中途断流时气泡还挂着光标会一直闪，兜底全摘 */
+    document.querySelectorAll('.bubble.streaming').forEach(b => b.classList.remove('streaming'));
     hideTyping();
     appendMsg('ai', '网络错误：' + e.message);
   }

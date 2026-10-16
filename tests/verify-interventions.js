@@ -370,7 +370,9 @@ console.log('\n[6] L4 可观测性：注入与闸门事件');
 
 console.log('\n[5] 版本号');
 {
-  ok(/APP_BUILD = 'v2026\.10\.15-c'/.test(web), 'APP_BUILD 已 bump 到 v2026.10.15-c');
+  /* ★ 2026-10-15：不再写死等值——bump 一次就要同步一次测试，漏了就红，
+     而红的是断言不是代码。改判「不早于 L1 注入上线版本」，后续 bump 自动通过。 */
+  require('./_build-version.js').assertBuildAtLeast(ok, 'index.html', 'APP_BUILD', 'v2026.10.15-c', '访谈页版本号');
 }
 
 console.log('\n' + (fail ? '✗' : '✓') + ' 通过 ' + pass + ' 项，失败 ' + fail + ' 项\n');
