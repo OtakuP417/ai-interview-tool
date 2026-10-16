@@ -12,7 +12,11 @@
  * 判据：版本号断言要表达的是「**不早于**该功能上线的版本」，不是「**等于**某个值」。
  *   这样后续 bump 自动通过，而版本号被回退、写坏、删掉时仍然会红。
  *
- * 版本号格式：vYYYY.MM.DD-x（x 为当日递增小写字母）。
+ * 版本号格式（2026-10-16 定的编码规则）：
+ *   vYYYY.MM.DD-x —— 日期＝**这次更新的日期**，x＝**当天第几次更新**
+ *   （a 第1次、b 第2次…），**跨天重置**。三端各自独立计数。
+ *   例：当天第1次更新 → v2026.10.16-a；同日再改一次 → v2026.10.16-b。
+ *   次日再改，不管昨天到哪，都回到 v2026.10.17-a。
  */
 const fs = require('fs');
 const path = require('path');
@@ -59,4 +63,28 @@ function assertBuildAtLeast(ok, file, name, since, feature) {
   return actual;
 }
 
-module.exports = { readBuild, parseBuild, buildAtLeast, assertBuildAtLeast, ROOT };
+/** 后缀自增：a→b … z→aa（与 buildAtLeast 的「长度优先」比较口径一致）。 */
+function incSuffix(s) {
+  if (s === '') return 'a';
+  const last = s[s.length - 1], head = s.slice(0, -1);
+  if (last === 'z') return incSuffix(head) + 'a';
+  return head + String.fromCharCode(last.charCodeAt(0) + 1);
+}
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/**
+ * 按编码规则算出「下一个版本号」：给定当前版本号与**本次更新的日期**。
+ *   nextBuild('v2026.10.15-d', '2026-10-16') → 'v2026.10.16-a'（跨天重置）
+ *   nextBuild('v2026.10.16-a', '2026-10-16') → 'v2026.10.16-b'（同日递增）
+ * 日期不合法直接抛——宁可崩也不要生成出一个看起来对、实则骗人的版本号。
+ */
+function nextBuild(prev, date) {
+  const d = String(date || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('date 需为 YYYY-MM-DD，收到 ' + JSON.stringify(date));
+  const v = 'v' + d.replace(/-/g, '.');
+  const p = parseBuild(prev);
+  if (p && p[0] + '-' + pad2(p[1]) + '-' + pad2(p[2]) === d) return v + '-' + incSuffix(p[3]);
+  return v + '-a';
+}
+
+module.exports = { readBuild, parseBuild, buildAtLeast, assertBuildAtLeast, nextBuild, incSuffix, ROOT };
