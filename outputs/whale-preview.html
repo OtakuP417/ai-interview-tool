@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body{margin:0;padding:24px;background:#fff;font-family:sans-serif;display:flex;gap:32px;align-items:flex-end}
+.box{text-align:center;font-size:12px;color:#888}
+.big{width:240px;height:240px}
+.small{width:34px;height:34px;border-radius:50%;background:#1f7ae0;display:flex;align-items:center;justify-content:center;color:#fff}
+.small svg{width:24px;height:24px}
+</style></head><body>
+
+<div class="box"><div class="big" id="a"></div>240px 大图</div>
+<div class="box"><div class="small" id="b"></div><br>34px 实际效果</div>
+
+<script>
+// ★ 自创极简蓝鲸 v2：一体化轮廓（头圆尾收），月牙形尾鳍与身体同一条 path，
+//   避免上一版「椭圆 + 独立尾巴」的金鱼感。腹部留白、背脊高光、嘴线、喷水。
+const WHALE = `
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path fill="currentColor" d="
+    M4.2 18.2
+    Q4.2 11.2 12.8 11.2
+    Q20.6 11.2 22.6 15.4
+    L25.2 11.8
+    Q26.2 10.6 26 12.2
+    L25.4 16.4
+    Q25.3 17.4 25.5 18.6
+    L26.2 23
+    Q26.4 24.6 25.3 23.4
+    L22.8 20.8
+    Q20.4 24.8 12.8 24.8
+    Q4.2 24.8 4.2 18.2 Z"/>
+  <circle cx="9.4" cy="16.6" r="1.45" fill="#fff"/>
+  <path d="M5.5 20.6 Q7 21.8 8.9 21.5" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" fill="none" opacity="0.55"/>
+  <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5">
+    <path d="M9.8 9 V6.6"/>
+    <path d="M12.6 8.2 Q14.4 7.4 15 5.6"/>
+  </g>
+</svg>`;
+document.getElementById('a').innerHTML = WHALE.replace('currentColor','#1f7ae0');
+document.getElementById('b').innerHTML = WHALE;
+</script>
+</body></html>

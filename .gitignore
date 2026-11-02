@@ -58,3 +58,10 @@ _report_*.json
 # docs/ 里放的是「用真实数据跑出来的分析文档」，不是项目源码。
 # 模板与结论请提炼进 .workbuddy/memory/ 或 skill，原件留本机即可。
 docs/
+
+# PPT 生成中间产物
+outputs/**/.cache/
+outputs/**/.slidep/
+
+# 内部宣导材料（含公司业务内容，禁止入库）
+outputs/开门红-AI访谈工具宣导/
